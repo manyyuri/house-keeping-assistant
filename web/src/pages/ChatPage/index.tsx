@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  App as AntApp,
   Button,
   Empty,
   Image,
-  message as antdMessage,
   Tag,
   Typography,
   Upload,
@@ -35,6 +35,7 @@ import PlanCard from './PlanCard';
 import ThoughtPanel from './ThoughtPanel';
 
 const { Text } = Typography;
+const { message: antdMessage } = AntApp.useApp();
 
 const TOOL_TITLES: Record<string, string> = {
   save_items: '物品入库',
@@ -310,7 +311,7 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
           {m.photos?.length ? (
             <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
               {m.photos.map((p) => (
-                <Image key={p.photoId} src={p.url} width={64} height={64} style={{ objectFit: 'cover', borderRadius: 8 }} />
+                <Image key={p.photoId} src={p.url} alt="用户上传照片" width={64} height={64} style={{ objectFit: 'cover', borderRadius: 8 }} />
               ))}
             </div>
           ) : null}
@@ -347,7 +348,7 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
             <Tag icon={<StopOutlined />}>已停止生成</Tag>
           </div>
         )}
-        {m.status === 'error' && m.error && <Alert type="error" showIcon message={m.error} style={{ marginTop: 8 }} />}
+        {m.status === 'error' && m.error && <Alert type="error" showIcon title={m.error} style={{ marginTop: 8 }} />}
       </div>
     );
   };

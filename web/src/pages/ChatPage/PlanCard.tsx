@@ -59,13 +59,13 @@ export default function PlanCard({ plan: payload, onGoTasks }: { plan: PlanCreat
         <Col flex="auto">
           <Row gutter={8}>
             <Col span={8}>
-              <Statistic title="丢弃" value={detail?.discard_count ?? 0} valueStyle={{ color: '#cf1322', fontSize: 18 }} />
+              <Statistic title="丢弃" value={detail?.discard_count ?? 0} styles={{ content: { color: '#cf1322', fontSize: 18 } }} />
             </Col>
             <Col span={8}>
-              <Statistic title="捐赠" value={detail?.donate_count ?? 0} valueStyle={{ color: '#d46b08', fontSize: 18 }} />
+              <Statistic title="捐赠" value={detail?.donate_count ?? 0} styles={{ content: { color: '#d46b08', fontSize: 18 } }} />
             </Col>
             <Col span={8}>
-              <Statistic title="保留" value={detail?.keep_count ?? 0} valueStyle={{ color: '#389e0d', fontSize: 18 }} />
+              <Statistic title="保留" value={detail?.keep_count ?? 0} styles={{ content: { color: '#389e0d', fontSize: 18 } }} />
             </Col>
           </Row>
         </Col>

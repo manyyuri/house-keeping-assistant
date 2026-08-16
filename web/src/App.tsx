@@ -150,7 +150,7 @@ export default function App() {
           </Header>
           <Drawer
             placement="left"
-            width={280}
+            size="default"
             open={drawerOpen}
             onClose={() => setDrawerOpen(false)}
             title={
@@ -179,7 +179,7 @@ export default function App() {
             items={tabs}
             tabBarStyle={{ margin: 0, padding: '0 16px' }}
             style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
-            tabPosition={isMobile ? 'bottom' : 'top'}
+            tabPlacement={isMobile ? 'bottom' : 'top'}
             destroyOnHidden={false}
           />
         </Content>
