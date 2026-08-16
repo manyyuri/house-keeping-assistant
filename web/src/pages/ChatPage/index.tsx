@@ -35,7 +35,6 @@ import PlanCard from './PlanCard';
 import ThoughtPanel from './ThoughtPanel';
 
 const { Text } = Typography;
-const { message: antdMessage } = AntApp.useApp();
 
 const TOOL_TITLES: Record<string, string> = {
   save_items: '物品入库',
@@ -61,6 +60,7 @@ function pathToUrl(path: string): string {
 }
 
 export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
+  const { message: antdMessage } = AntApp.useApp();
   const activeId = useConversationStore((s) => s.activeId);
   const bumpVersion = useBusinessStore((s) => s.bumpVersion);
 
