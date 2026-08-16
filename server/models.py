@@ -100,3 +100,24 @@ class PlanOut(BaseModel):
     status: str = "active"
     created_at: Optional[str] = None
     tasks: List[Dict[str, Any]] = []
+
+
+# ---------- LLM 模型设置 ----------
+
+class LLMEndpointIn(BaseModel):
+    """api_key 为空串 = 保持已存值。"""
+
+    provider: str = "ollama"
+    base_url: str = ""
+    api_key: str = ""
+    model: str = ""
+
+
+class LLMSettingsIn(BaseModel):
+    vision: Optional[LLMEndpointIn] = None
+    agent: Optional[LLMEndpointIn] = None
+
+
+class LLMTestIn(BaseModel):
+    scope: str  # vision | agent
+    endpoint: Optional[LLMEndpointIn] = None

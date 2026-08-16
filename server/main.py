@@ -25,10 +25,12 @@ from server import agent, db, llm_providers, rules, vision
 from server.models import (
     ConversationCreate,
     ItemPatch,
+    LLMSettingsIn,
+    LLMTestIn,
     PlanPatch,
     TaskPatch,
 )
-from server.llm_providers import LLMUnavailable
+from server.llm_providers import Endpoint, LLMUnavailable
 from server.prompts import SYSTEM_PROMPT
 from server.sse import sse_event
 from server.tools import ToolContext
@@ -444,3 +446,53 @@ async def chat(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# ---------- LLM 模型设置（§4：读取/保存/测试连接）----------
+
+@app.get("/api/settings/llm")
+async def get_llm_settings():
+    """掩码视图：api_key 恒为空串，只回 api_key_masked。"""
+    return llm_providers.settings_view()
+
+
+@app.put("/api/settings/llm")
+async def put_llm_settings(body: LLMSettingsIn):
+    """保存即生效（进程内配置缓存写时失效，无需重启）。"""
+    payload = body.model_dump()
+    notices = llm_providers.locked_notices(payload)  # 环境变量覆盖的字段提示不生效
+    try:
+        llm_providers.save_config(payload)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    view = llm_providers.settings_view()
+    if notices:
+        view["notices"] = notices
+        for n in notices:
+            logger.warning("模型设置：%s", n)
+    return view
+
+
+@app.post("/api/settings/llm/test")
+async def test_llm_settings(body: LLMTestIn):
+    """测试连接：用表单当前值（缺省字段回退已存配置），支持"保存前先测"。"""
+    if body.scope not in ("vision", "agent"):
+        raise HTTPException(422, "scope 必须为 vision 或 agent")
+    cfg = llm_providers.get_config()
+    saved = cfg.vision if body.scope == "vision" else cfg.agent
+    ep_in = body.endpoint.model_dump() if body.endpoint else {}
+    endpoint = Endpoint(
+        provider=(ep_in.get("provider") or saved.provider).strip(),
+        base_url=(ep_in.get("base_url") or saved.base_url).strip(),
+        api_key=(ep_in.get("api_key") or saved.api_key).strip(),
+        model=(ep_in.get("model") or saved.model).strip(),
+    )
+    if endpoint.provider == llm_providers.PROVIDER_OLLAMA and not endpoint.base_url:
+        endpoint.base_url = llm_providers.OLLAMA_DEFAULT_URL
+    if endpoint.provider == llm_providers.PROVIDER_OPENAI:
+        from server import openai_provider
+
+        return await openai_provider.check_health(endpoint, body.scope)
+    from server import ollama_provider
+
+    return await ollama_provider.check_health(endpoint)
