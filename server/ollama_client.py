@@ -29,7 +29,8 @@ class OllamaUnavailable(RuntimeError):
 async def _request(
     path: str, payload: Dict[str, Any], timeout: httpx.Timeout
 ) -> Dict[str, Any]:
-    async with httpx.AsyncClient(base_url=OLLAMA_URL, timeout=timeout) as client:
+    # trust_env=False：绕过系统代理，本地 Ollama 直连
+    async with httpx.AsyncClient(base_url=OLLAMA_URL, timeout=timeout, trust_env=False) as client:
         try:
             resp = await client.post(path, json=payload)
             resp.raise_for_status()
@@ -79,7 +80,7 @@ async def check_models() -> Dict[str, bool]:
     """探测视觉与 Agent 模型是否已拉取（供健康检查/降级提示）。"""
     available: Dict[str, bool] = {VISION_MODEL: False, AGENT_MODEL: False}
     try:
-        async with httpx.AsyncClient(base_url=OLLAMA_URL, timeout=5.0) as client:
+        async with httpx.AsyncClient(base_url=OLLAMA_URL, timeout=5.0, trust_env=False) as client:
             resp = await client.get("/api/tags")
             resp.raise_for_status()
             for m in resp.json().get("models", []):

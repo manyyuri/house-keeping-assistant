@@ -4,31 +4,34 @@
     uvicorn server.main:app --host 0.0.0.0 --port 8000
 """
 
+import asyncio
 import io
 import logging
 import re
 import socket
 import uuid
 from datetime import date
-from pathlib import Path
-from typing import List, Optional
+from typing import AsyncIterator, List, Optional
 
 import qrcode
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps
 from pillow_heif import register_heif_opener
 
-from server import db, rules
+from server import agent, db, rules, vision
 from server.models import (
     ConversationCreate,
     ItemPatch,
     PlanPatch,
     TaskPatch,
 )
+from server.ollama_client import OllamaUnavailable
 from server.prompts import SYSTEM_PROMPT
+from server.sse import sse_event
+from server.tools import ToolContext
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("danshari")
@@ -271,3 +274,166 @@ async def get_stats():
         "active_hesitate": db.active_hesitate_items(),
         "expired_quarantine": db.expired_quarantine_items(),
     }
+
+
+# ---------- SSE：/api/chat（视觉→Agent→工具→事件流，§5.4）----------
+
+DELTA_CHUNK = 80          # 最终文本分段推送粒度
+HISTORY_LIMIT = 6         # needle 是 14MB 轻量模型，历史窗口要小
+
+
+def _history_for_agent(conversation_id: int) -> List[dict]:
+    rows = [
+        m for m in db.list_messages(conversation_id)
+        if m["role"] in ("user", "assistant")
+    ]
+    return [{"role": m["role"], "content": m["content"]} for m in rows[-HISTORY_LIMIT:]]
+
+
+async def _chat_stream(
+    request: Request,
+    conversation_id: int,
+    message: str,
+    photo_ids: List[int],
+) -> AsyncIterator[str]:
+    """单次连接内按序推送 SSE 事件；客户端断开则终止管道。"""
+    photos = db.get_photos(photo_ids)
+    attachments = [{"photoId": p["id"], "path": p["path"]} for p in photos]
+    db.add_message(conversation_id, "user", message, attachments)
+
+    summaries: List[str] = []
+    messiness = "low"
+
+    # ① 视觉识别
+    if photos:
+        yield sse_event("vision_start", {"photoIds": [p["id"] for p in photos]})
+        for p in photos:
+            if await request.is_disconnected():
+                return
+            img_path = db.DATA_DIR / p["path"]
+            try:
+                raw = img_path.read_bytes()
+            except OSError as e:
+                yield sse_event("error", {"message": f"照片文件缺失：{e}", "stage": "vision"})
+                continue
+            try:
+                result = await vision.recognize(raw, room_hint=p.get("room") or "")
+            except OllamaUnavailable as e:
+                yield sse_event("error", {"message": str(e), "stage": "vision"})
+                yield sse_event("done", {"messageId": None})
+                return
+            except Exception as e:  # noqa: BLE001 — 模型超时/5xx 等不裸断流
+                logger.exception("视觉识别失败")
+                yield sse_event("error", {"message": f"视觉识别失败：{e}", "stage": "vision"})
+                yield sse_event("done", {"messageId": None})
+                return
+            db.update_photo_vision(p["id"], result.room, result.vision_text)
+            messiness = result.messiness
+            summaries.append(result.to_summary())
+            yield sse_event(
+                "vision_done",
+                {
+                    "photoId": p["id"],
+                    "room": result.room,
+                    "messiness": result.messiness,
+                    "items": result.items,
+                    "degraded": result.degraded,
+                },
+            )
+        yield sse_event("thought", {"node": "识别完成→开始评估", "status": "done"})
+
+    # ② Agent 编排（工具事件经队列实时转发）
+    ctx = ToolContext(
+        conversation_id=conversation_id,
+        photo_ids=[p["id"] for p in photos],
+        messiness=messiness,
+    )
+    messages = agent.build_messages(
+        _history_for_agent(conversation_id), message, summaries
+    )
+
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def on_event(ev: dict) -> None:
+        queue.put_nowait(ev)
+
+    task = asyncio.create_task(agent.run_agent(messages, ctx, on_event))
+
+    def map_event(ev: dict) -> str:
+        if ev["type"] == "tool_call":
+            return sse_event("tool_call", {"name": ev["name"], "args": ev["args"]})
+        if ev["type"] == "tool_result":
+            return sse_event(
+                "tool_result",
+                {"name": ev["name"], "ok": ev["ok"], "summary": ev["summary"]},
+            )
+        return sse_event("thought", ev)
+
+    try:
+        while not task.done():
+            if await request.is_disconnected():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+                logger.info("客户端断开，管道已终止（conversation=%s）", conversation_id)
+                return
+            try:
+                ev = await asyncio.wait_for(queue.get(), timeout=0.25)
+                yield map_event(ev)
+            except asyncio.TimeoutError:
+                continue
+        while not queue.empty():
+            yield map_event(queue.get_nowait())
+
+        result = task.result()
+    except OllamaUnavailable as e:
+        yield sse_event("error", {"message": str(e), "stage": "agent"})
+        yield sse_event("done", {"messageId": None})
+        return
+    except Exception as e:  # noqa: BLE001 — 兑底，不让 SSE 裸断
+        logger.exception("Agent 编排失败")
+        yield sse_event("error", {"message": f"Agent 编排失败：{e}", "stage": "agent"})
+        yield sse_event("done", {"messageId": None})
+        return
+
+    # ③ 最终文本分段流式
+    text = result.text.strip() or "本次整理已完成，请到任务看板查看可执行清单。"
+    for i in range(0, len(text), DELTA_CHUNK):
+        if await request.is_disconnected():
+            break
+        yield sse_event("message_delta", {"delta": text[i:i + DELTA_CHUNK]})
+
+    # ④ 计划卡片事件 + 收尾
+    if ctx.last_plan:
+        yield sse_event(
+            "plan_created",
+            {
+                "planId": ctx.last_plan["plan_id"],
+                "danshariScore": ctx.last_plan["danshari_score"],
+                "taskCount": ctx.last_plan.get("task_count", 0),
+            },
+        )
+    saved = db.add_message(conversation_id, "assistant", text)
+    yield sse_event("done", {"messageId": saved["id"]})
+
+
+@app.get("/api/chat")
+async def chat(
+    request: Request,
+    conversation_id: int,
+    message: str = Query(..., min_length=1),
+    photo_ids: str = Query(""),
+):
+    ids: List[int] = []
+    if photo_ids.strip():
+        try:
+            ids = [int(x) for x in photo_ids.split(",") if x.strip()]
+        except ValueError:
+            raise HTTPException(422, "photo_ids 格式应为逗号分隔的数字")
+    if not db.get_conversation(conversation_id):
+        raise HTTPException(404, "会话不存在")
+
+    return StreamingResponse(
+        _chat_stream(request, conversation_id, message, ids),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
