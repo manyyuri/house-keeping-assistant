@@ -21,14 +21,14 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps
 from pillow_heif import register_heif_opener
 
-from server import agent, db, rules, vision
+from server import agent, db, llm_providers, rules, vision
 from server.models import (
     ConversationCreate,
     ItemPatch,
     PlanPatch,
     TaskPatch,
 )
-from server.ollama_client import OllamaUnavailable
+from server.llm_providers import LLMUnavailable
 from server.prompts import SYSTEM_PROMPT
 from server.sse import sse_event
 from server.tools import ToolContext
@@ -58,9 +58,16 @@ app.mount("/api/photos", StaticFiles(directory=str(PHOTOS_DIR)), name="photos")
 @app.on_event("startup")
 async def startup() -> None:
     db.get_conn()  # 提前建表
+    cfg = llm_providers.get_config()
+
+    def _fmt(ep: llm_providers.Endpoint) -> str:
+        key = f" {llm_providers.mask_key(ep.api_key)}" if ep.api_key else ""
+        return f"{ep.provider}:{ep.model}{key}"
+
     logger.info(
         "系统提示词拼装完成：长度 %d 字符（含断舍离速查表）", len(SYSTEM_PROMPT)
     )
+    logger.info("模型配置：vision=%s agent=%s", _fmt(cfg.vision), _fmt(cfg.agent))
 
 
 @app.get("/api/health")
@@ -318,7 +325,7 @@ async def _chat_stream(
                 continue
             try:
                 result = await vision.recognize(raw, room_hint=p.get("room") or "")
-            except OllamaUnavailable as e:
+            except LLMUnavailable as e:
                 yield sse_event("error", {"message": str(e), "stage": "vision"})
                 yield sse_event("done", {"messageId": None})
                 return
@@ -385,7 +392,7 @@ async def _chat_stream(
             yield map_event(queue.get_nowait())
 
         result = task.result()
-    except OllamaUnavailable as e:
+    except LLMUnavailable as e:
         yield sse_event("error", {"message": str(e), "stage": "agent"})
         yield sse_event("done", {"messageId": None})
         return
