@@ -6,6 +6,9 @@ import type {
   ConversationDetail,
   Item,
   KeepStatus,
+  LLMEndpointPayload,
+  LLMSettingsView,
+  LLMTestResult,
   Plan,
   PhotoUploadResult,
   Stats,
@@ -104,6 +107,22 @@ export const patchItem = (id: number, body: { keep_status?: KeepStatus; last_use
   request<Item>(`/items/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 
 export const getStats = () => request<Stats>('/stats');
+
+// ---------- LLM 模型设置 ----------
+
+export const getLLMSettings = () => request<LLMSettingsView>('/settings/llm');
+
+export const saveLLMSettings = (body: { vision?: LLMEndpointPayload; agent?: LLMEndpointPayload }) =>
+  request<LLMSettingsView>('/settings/llm', {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+
+export const testLLMConnection = (scope: 'vision' | 'agent', endpoint?: LLMEndpointPayload) =>
+  request<LLMTestResult>('/settings/llm/test', {
+    method: 'POST',
+    body: JSON.stringify({ scope, endpoint }),
+  });
 
 // ---------- SSE /api/chat ----------
 

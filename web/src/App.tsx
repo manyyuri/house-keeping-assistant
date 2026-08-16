@@ -10,6 +10,7 @@ import {
   MenuOutlined,
   BarChartOutlined,
   ContainerOutlined,
+  SettingOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons';
 import { Conversations } from '@ant-design/x';
@@ -18,6 +19,7 @@ import ChatPage from './pages/ChatPage';
 import TasksPage from './pages/TasksPage';
 import ItemsPage from './pages/ItemsPage';
 import StatsPage from './pages/StatsPage';
+import LLMSettingsModal from './pages/SettingsPage/LLMSettingsModal';
 import { useBusinessStore, useConversationStore } from './stores';
 
 const { Sider, Header, Content } = Layout;
@@ -46,14 +48,14 @@ function QrEntry() {
         )
       }
     >
-      <Button icon={<QrcodeOutlined />} block>
-        iPhone 扫码访问
+      <Button icon={<QrcodeOutlined />} style={{ flex: 1, minWidth: 0 }}>
+        iPhone 扫码
       </Button>
     </Popover>
   );
 }
 
-function ConversationList() {
+function ConversationList({ onOpenSettings }: { onOpenSettings: () => void }) {
   const { message, modal } = AntApp.useApp();
   const { list, activeId, create, remove, setActive } = useConversationStore();
   const items = useMemo(() => list.map((c) => ({ key: String(c.id), label: c.title })), [list]);
@@ -95,7 +97,12 @@ function ConversationList() {
           })}
         />
       </div>
-      <QrEntry />
+      <div style={{ display: 'flex', gap: 8 }}>
+        <QrEntry />
+        <Button icon={<SettingOutlined />} onClick={onOpenSettings}>
+          模型设置
+        </Button>
+      </div>
     </div>
   );
 }
@@ -104,6 +111,7 @@ export default function App() {
   const { fetchList, create, list } = useConversationStore();
   const fetchAll = useBusinessStore((s) => s.fetchAll);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [tab, setTab] = useState('chat');
   const didInit = useRef(false);
   const screens = useBreakpoint();
@@ -147,6 +155,13 @@ export default function App() {
           >
             <Button type="text" icon={<MenuOutlined />} onClick={() => setDrawerOpen(true)} />
             <Typography.Text strong>断舍离整理助手</Typography.Text>
+            <span style={{ flex: 1 }} />
+            <Button
+              type="text"
+              icon={<SettingOutlined />}
+              onClick={() => setSettingsOpen(true)}
+              aria-label="模型设置"
+            />
           </Header>
           <Drawer
             placement="left"
@@ -163,12 +178,12 @@ export default function App() {
             }
             styles={{ body: { padding: 0 } }}
           >
-            <ConversationList />
+            <ConversationList onOpenSettings={() => setSettingsOpen(true)} />
           </Drawer>
         </>
       ) : (
         <Sider width={260} theme="light" style={{ borderRight: '1px solid #f0f0f0' }}>
-          <ConversationList />
+          <ConversationList onOpenSettings={() => setSettingsOpen(true)} />
         </Sider>
       )}
       <Layout>
@@ -184,6 +199,7 @@ export default function App() {
           />
         </Content>
       </Layout>
+      <LLMSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </Layout>
   );
 }

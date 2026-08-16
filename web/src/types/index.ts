@@ -86,6 +86,47 @@ export interface Stats {
   expired_quarantine: Item[];
 }
 
+// ---------- LLM 模型设置 ----------
+
+export interface LLMEndpointView {
+  provider: string; // 'ollama' | 'openai'
+  base_url: string;
+  model: string;
+  /** 恒为空串（后端永不回显明文） */
+  api_key: string;
+  api_key_masked: string;
+}
+
+export interface LLMProviderPreset {
+  label: string;
+  base_url: string;
+  vision_model: string;
+  agent_model: string;
+}
+
+export interface LLMSettingsView {
+  vision: LLMEndpointView;
+  agent: LLMEndpointView;
+  /** 环境变量锁定的字段路径（"vision.model" 等），UI 对应输入 disabled */
+  readonly: Record<string, boolean>;
+  provider_options: LLMProviderPreset[];
+  /** 保存时：被环境变量覆盖而未生效的字段提示 */
+  notices?: string[];
+}
+
+export interface LLMEndpointPayload {
+  provider: string;
+  base_url?: string;
+  api_key?: string;
+  model?: string;
+}
+
+export interface LLMTestResult {
+  ok: boolean;
+  message: string;
+  latency_ms?: number;
+}
+
 // ---------- SSE 事件负载 ----------
 
 export interface VisionDonePayload {
