@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 数据库与照片（运行时生成）
+server/data/
+
+# 前端
+node_modules/
+web/dist/
+
+# 杂项
+.DS_Store
+*.log
