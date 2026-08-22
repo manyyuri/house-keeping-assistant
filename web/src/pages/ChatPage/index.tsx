@@ -244,11 +244,14 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
 
   const send = useCallback(
     async (text: string) => {
-      if (!activeId || !text.trim()) return;
+      if (!activeId) return;
       const photoIds = fileList
         .filter((f) => f.status === 'done')
         .map((f) => (f.response as unknown as PhotoUploadResult)?.photoId)
         .filter((x): x is number => typeof x === 'number');
+      // 纯照片发送：未输入文字时补默认提示词，后端要求 message 非空
+      const finalText = text.trim() || (photoIds.length ? '请根据照片帮我按断舍离的方法整理' : '');
+      if (!finalText) return;
 
       const assistantId = nextId();
       setMessages((ms) => [
@@ -256,7 +259,7 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
         {
           id: nextId(),
           role: 'user',
-          content: text,
+          content: finalText,
           thoughts: [],
           status: 'done',
           photos: fileList
@@ -278,7 +281,7 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
       try {
         await api.streamChat({
           conversationId: activeId,
-          message: text,
+          message: finalText,
           photoIds,
           signal: controller.signal,
           onEvent: (ev) => handleEvent(assistantId, ev),

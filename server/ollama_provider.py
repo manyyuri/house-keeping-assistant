@@ -12,7 +12,7 @@ from server.llm_providers import Endpoint, LLMUnavailable
 logger = logging.getLogger("danshari.ollama")
 
 _TIMEOUT_VISION = httpx.Timeout(300.0, connect=10.0)  # 视觉推理较慢
-_TIMEOUT_AGENT = httpx.Timeout(120.0, connect=10.0)
+_TIMEOUT_AGENT = httpx.Timeout(300.0, connect=10.0)  # qwen3-vl 自带思考，Agent 多轮也慢
 
 
 class OllamaUnavailable(LLMUnavailable):
@@ -46,7 +46,7 @@ async def vision_generate(endpoint: Endpoint, images: List[bytes], prompt: str) 
         "prompt": prompt,
         "images": [base64.b64encode(b).decode() for b in images],
         "stream": False,
-        "options": {"temperature": 0.2},
+        "options": {"temperature": 0.2, "num_ctx": 8192},
     }
     data = await _request(endpoint, "/api/generate", payload, _TIMEOUT_VISION)
     return data.get("response", "")
@@ -57,11 +57,12 @@ async def agent_chat(
     messages: List[Dict[str, Any]],
     tools: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """Agent（needle）：文本 → function calls。返回 Ollama 风格 message。"""
+    """Agent（function calling）：文本 → tool calls。返回 Ollama 风格 message。"""
     payload: Dict[str, Any] = {
         "model": endpoint.model,
         "messages": messages,
         "stream": False,
+        "options": {"num_ctx": 16384},
     }
     if tools:
         payload["tools"] = tools

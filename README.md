@@ -15,6 +15,8 @@ iPhone Safari ──局域网──► Vite dev :5173 ──proxy──► FastA
                                                    └─ 照片存储 (server/data/photos/yyyy-mm-dd/)
 ```
 
+> Agent 模型同样默认 `qwen3-vl:8b`（已验证支持 function calling）；如需换回轻量 Agent 模型，可用环境变量 `AGENT_MODEL` 覆盖。
+
 - **视觉与调度分离**：视觉通道只负责图 → 结构化中文 JSON（物品清单/区域/混乱度）；Agent 通道只负责 function calling 与计划编排——任何 provider 下都不混用
 - **双通道并存**：本地 Ollama（免费、离线）与云端 API（OpenAI 兼容）可随时切换，视觉与 Agent 还可独立选路（如"照片不出内网 + 云端 Agent"）
 - **断舍离理论内置**：`knowledge/duansheli/`（原书全文知识库副本，8 文件）；系统提示词启动时拼入 `cheatsheet.md`
@@ -27,8 +29,7 @@ iPhone Safari ──局域网──► Vite dev :5173 ──proxy──► FastA
 
 ```bash
 # 安装 Ollama: https://ollama.com/download/mac
-ollama pull qwen3-vl:8b   # 视觉模型（4bit 约 5.5GB 内存；32GB 机器可换 qwen3-vl:30b）
-ollama pull needle        # Agent 模型（14MB）
+ollama pull qwen3-vl:8b   # 视觉 + Agent 共用（4bit 约 5.5GB 内存）
 ```
 
 ### 2. 启动后端

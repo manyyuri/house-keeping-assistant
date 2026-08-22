@@ -21,7 +21,7 @@ PROVIDER_OPENAI = "openai"
 
 OLLAMA_DEFAULT_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 DEFAULT_VISION_MODEL = "qwen3-vl:8b"
-DEFAULT_AGENT_MODEL = "needle"
+DEFAULT_AGENT_MODEL = "qwen3-vl:8b"
 
 # 常用 OpenAI 兼容服务商预设（UI 下拉用；模型名仅占位建议，以各家文档为准）
 PROVIDER_PRESETS = [

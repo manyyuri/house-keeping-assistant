@@ -122,9 +122,12 @@ export default function App() {
     didInit.current = true;
     void (async () => {
       await fetchList();
-      const { list: l } = useConversationStore.getState();
+      const { list: l, activeId: cur } = useConversationStore.getState();
       if (!l.length) {
         await create('新整理对话').catch(() => undefined);
+      } else if (cur == null) {
+        // 有历史会话但未选中（如手机端未点侧边栏）→ 自动选第一个，避免发送静默失败
+        useConversationStore.getState().setActive(l[0].id);
       }
     })();
     void fetchAll();
