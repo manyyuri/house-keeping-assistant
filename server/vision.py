@@ -53,7 +53,9 @@ class VisionResult:
 
 
 def _extract_json(text: str) -> Dict[str, Any]:
-    """容错解析：可能带 markdown 代码块或多余文字，提取第一个 {...}。"""
+    """容错解析：剥 <think>/<answer> 标签，再提取 markdown 代码块或首个 {...}。"""
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+    text = re.sub(r"</?(?:answer|tool_call)>", "", text)
     text = text.strip()
     fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
     if fenced:

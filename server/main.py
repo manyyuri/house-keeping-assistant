@@ -299,130 +299,135 @@ def _history_for_agent(conversation_id: int) -> List[dict]:
     return [{"role": m["role"], "content": m["content"]} for m in rows[-HISTORY_LIMIT:]]
 
 
+_PIPELINE_END = object()  # SSE 中继循环终止哨兵
+
+
 async def _chat_stream(
     request: Request,
     conversation_id: int,
     message: str,
     photo_ids: List[int],
 ) -> AsyncIterator[str]:
-    """单次连接内按序推送 SSE 事件；客户端断开则终止管道。"""
+    """SSE 中继：管道在后台任务中执行，客户端断开后仍继续跑完并落库。
+
+    手机端锁屏/切后台会掐断 SSE（iOS Safari 行为），若管道随连接取消，
+    已执行到一半的 Agent 轮次与最终总结将丢失。改为：断连仅停止事件转发，
+    管道后台继续 → 用户重新打开会话即可看到完整回复。
+    """
     photos = db.get_photos(photo_ids)
     attachments = [{"photoId": p["id"], "path": p["path"]} for p in photos]
     db.add_message(conversation_id, "user", message, attachments)
 
-    summaries: List[str] = []
-    messiness = "low"
-
-    # ① 视觉识别
-    if photos:
-        yield sse_event("vision_start", {"photoIds": [p["id"] for p in photos]})
-        for p in photos:
-            if await request.is_disconnected():
-                return
-            img_path = db.DATA_DIR / p["path"]
-            try:
-                raw = img_path.read_bytes()
-            except OSError as e:
-                yield sse_event("error", {"message": f"照片文件缺失：{e}", "stage": "vision"})
-                continue
-            try:
-                result = await vision.recognize(raw, room_hint=p.get("room") or "")
-            except LLMUnavailable as e:
-                yield sse_event("error", {"message": str(e), "stage": "vision"})
-                yield sse_event("done", {"messageId": None})
-                return
-            except Exception as e:  # noqa: BLE001 — 模型超时/5xx 等不裸断流
-                logger.exception("视觉识别失败")
-                yield sse_event("error", {"message": f"视觉识别失败：{e}", "stage": "vision"})
-                yield sse_event("done", {"messageId": None})
-                return
-            db.update_photo_vision(p["id"], result.room, result.vision_text)
-            messiness = result.messiness
-            summaries.append(result.to_summary())
-            yield sse_event(
-                "vision_done",
-                {
-                    "photoId": p["id"],
-                    "room": result.room,
-                    "messiness": result.messiness,
-                    "items": result.items,
-                    "degraded": result.degraded,
-                },
-            )
-        yield sse_event("thought", {"node": "识别完成→开始评估", "status": "done"})
-
-    # ② Agent 编排（工具事件经队列实时转发）
-    ctx = ToolContext(
-        conversation_id=conversation_id,
-        photo_ids=[p["id"] for p in photos],
-        messiness=messiness,
-    )
-    messages = agent.build_messages(
-        _history_for_agent(conversation_id), message, summaries
-    )
-
     queue: asyncio.Queue = asyncio.Queue()
 
-    async def on_event(ev: dict) -> None:
-        queue.put_nowait(ev)
+    async def pipeline() -> None:
+        summaries: List[str] = []
+        messiness = "low"
 
-    task = asyncio.create_task(agent.run_agent(messages, ctx, on_event))
+        # ① 视觉识别
+        if photos:
+            queue.put_nowait(sse_event("vision_start", {"photoIds": [p["id"] for p in photos]}))
+            for p in photos:
+                img_path = db.DATA_DIR / p["path"]
+                try:
+                    raw = img_path.read_bytes()
+                except OSError as e:
+                    queue.put_nowait(sse_event("error", {"message": f"照片文件缺失：{e}", "stage": "vision"}))
+                    continue
+                try:
+                    result = await vision.recognize(raw, room_hint=p.get("room") or "")
+                except LLMUnavailable as e:
+                    queue.put_nowait(sse_event("error", {"message": str(e), "stage": "vision"}))
+                    queue.put_nowait(sse_event("done", {"messageId": None}))
+                    return
+                except Exception as e:  # noqa: BLE001 — 模型超时/5xx 等不裸断流
+                    logger.exception("视觉识别失败")
+                    queue.put_nowait(sse_event("error", {"message": f"视觉识别失败：{e}", "stage": "vision"}))
+                    queue.put_nowait(sse_event("done", {"messageId": None}))
+                    return
+                db.update_photo_vision(p["id"], result.room, result.vision_text)
+                messiness = result.messiness
+                summaries.append(result.to_summary())
+                queue.put_nowait(
+                    sse_event(
+                        "vision_done",
+                        {
+                            "photoId": p["id"],
+                            "room": result.room,
+                            "messiness": result.messiness,
+                            "items": result.items,
+                            "degraded": result.degraded,
+                        },
+                    )
+                )
+            queue.put_nowait(sse_event("thought", {"node": "识别完成→开始评估", "status": "done"}))
 
-    def map_event(ev: dict) -> str:
-        if ev["type"] == "tool_call":
-            return sse_event("tool_call", {"name": ev["name"], "args": ev["args"]})
-        if ev["type"] == "tool_result":
-            return sse_event(
-                "tool_result",
-                {"name": ev["name"], "ok": ev["ok"], "summary": ev["summary"]},
-            )
-        return sse_event("thought", ev)
-
-    try:
-        while not task.done():
-            if await request.is_disconnected():
-                task.cancel()
-                await asyncio.gather(task, return_exceptions=True)
-                logger.info("客户端断开，管道已终止（conversation=%s）", conversation_id)
-                return
-            try:
-                ev = await asyncio.wait_for(queue.get(), timeout=0.25)
-                yield map_event(ev)
-            except asyncio.TimeoutError:
-                continue
-        while not queue.empty():
-            yield map_event(queue.get_nowait())
-
-        result = task.result()
-    except LLMUnavailable as e:
-        yield sse_event("error", {"message": str(e), "stage": "agent"})
-        yield sse_event("done", {"messageId": None})
-        return
-    except Exception as e:  # noqa: BLE001 — 兑底，不让 SSE 裸断
-        logger.exception("Agent 编排失败")
-        yield sse_event("error", {"message": f"Agent 编排失败：{e}", "stage": "agent"})
-        yield sse_event("done", {"messageId": None})
-        return
-
-    # ③ 最终文本分段流式
-    text = result.text.strip() or "本次整理已完成，请到任务看板查看可执行清单。"
-    for i in range(0, len(text), DELTA_CHUNK):
-        if await request.is_disconnected():
-            break
-        yield sse_event("message_delta", {"delta": text[i:i + DELTA_CHUNK]})
-
-    # ④ 计划卡片事件 + 收尾
-    if ctx.last_plan:
-        yield sse_event(
-            "plan_created",
-            {
-                "planId": ctx.last_plan["plan_id"],
-                "danshariScore": ctx.last_plan["danshari_score"],
-                "taskCount": ctx.last_plan.get("task_count", 0),
-            },
+        # ② Agent 编排（工具事件经队列实时转发）
+        ctx = ToolContext(
+            conversation_id=conversation_id,
+            photo_ids=[p["id"] for p in photos],
+            messiness=messiness,
         )
-    saved = db.add_message(conversation_id, "assistant", text)
-    yield sse_event("done", {"messageId": saved["id"]})
+        messages = agent.build_messages(
+            _history_for_agent(conversation_id), message, summaries
+        )
+
+        async def on_event(ev: dict) -> None:
+            if ev["type"] == "tool_call":
+                queue.put_nowait(sse_event("tool_call", {"name": ev["name"], "args": ev["args"]}))
+            elif ev["type"] == "tool_result":
+                queue.put_nowait(
+                    sse_event("tool_result", {"name": ev["name"], "ok": ev["ok"], "summary": ev["summary"]})
+                )
+            else:
+                queue.put_nowait(sse_event("thought", ev))
+        try:
+            result = await agent.run_agent(messages, ctx, on_event)
+        except LLMUnavailable as e:
+            queue.put_nowait(sse_event("error", {"message": str(e), "stage": "agent"}))
+            queue.put_nowait(sse_event("done", {"messageId": None}))
+            return
+        except Exception as e:  # noqa: BLE001 — 兑底，不让管道裸断
+            logger.exception("Agent 编排失败")
+            queue.put_nowait(sse_event("error", {"message": f"Agent 编排失败：{e}", "stage": "agent"}))
+            queue.put_nowait(sse_event("done", {"messageId": None}))
+            return
+
+        # ③ 最终文本分段（推入队列；客户端在不在都照常落库）
+        text = result.text.strip() or "本次整理已完成，请到任务看板查看可执行清单。"
+        for i in range(0, len(text), DELTA_CHUNK):
+            queue.put_nowait(sse_event("message_delta", {"delta": text[i : i + DELTA_CHUNK]}))
+
+        # ④ 计划卡片事件 + 收尾
+        if ctx.last_plan:
+            queue.put_nowait(
+                sse_event(
+                    "plan_created",
+                    {
+                        "planId": ctx.last_plan["plan_id"],
+                        "danshariScore": ctx.last_plan["danshari_score"],
+                        "taskCount": ctx.last_plan.get("task_count", 0),
+                    },
+                )
+            )
+        saved = db.add_message(conversation_id, "assistant", text)
+        queue.put_nowait(sse_event("done", {"messageId": saved["id"]}))
+
+    task = asyncio.create_task(pipeline())
+    task.add_done_callback(lambda _: queue.put_nowait(_PIPELINE_END))
+
+    # SSE 中继：只转发事件，不取消管道
+    while True:
+        if await request.is_disconnected():
+            logger.info("客户端断开，管道后台继续执行（conversation=%s）", conversation_id)
+            return
+        try:
+            item = await asyncio.wait_for(queue.get(), timeout=0.25)
+        except asyncio.TimeoutError:
+            continue
+        if item is _PIPELINE_END:
+            return
+        yield item
 
 
 @app.get("/api/chat")

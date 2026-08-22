@@ -70,6 +70,8 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const fileMapRef = useRef<Map<string, File>>(new Map());
   const abortRef = useRef<AbortController | null>(null);
+  // Wake Lock：生成期间保持屏幕常亮，避免 iOS 锁屏掐断 SSE
+  const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
   const attRef = useRef<AttachmentsRef>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -276,6 +278,14 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
       fileMapRef.current.clear();
       setGenerating(true);
 
+      // 尝试申请屏幕常亮（iOS 16.4+ / 不支持时静默忽略）
+      try {
+        const nav = navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } };
+        wakeLockRef.current = (await nav.wakeLock?.request('screen')) ?? null;
+      } catch {
+        /* 不支持则忽略 */
+      }
+
       const controller = new AbortController();
       abortRef.current = controller;
       try {
@@ -296,6 +306,12 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
       } finally {
         setGenerating(false);
         abortRef.current = null;
+        try {
+          await wakeLockRef.current?.release();
+        } catch {
+          /* 忽略 */
+        }
+        wakeLockRef.current = null;
       }
     },
     [activeId, fileList, handleEvent, patchAssistant],
