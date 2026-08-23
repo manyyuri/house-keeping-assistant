@@ -21,12 +21,15 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps
 from pillow_heif import register_heif_opener
 
-from server import agent, db, llm_providers, rules, vision
+from server import agent, db, llm_providers, meals, rules, vision
 from server.models import (
     ConversationCreate,
+    GroceryCheckPatch,
     ItemPatch,
     LLMSettingsIn,
     LLMTestIn,
+    MealRerollIn,
+    MealStatusPatch,
     PlanPatch,
     TaskPatch,
 )
@@ -60,6 +63,9 @@ app.mount("/api/photos", StaticFiles(directory=str(PHOTOS_DIR)), name="photos")
 @app.on_event("startup")
 async def startup() -> None:
     db.get_conn()  # 提前建表
+    seeded = meals.seed_default_recipes()
+    if seeded:
+        logger.info("种子菜谱导入 %d 道（knowledge/recipes）", seeded)
     cfg = llm_providers.get_config()
 
     def _fmt(ep: llm_providers.Endpoint) -> str:
@@ -283,6 +289,77 @@ async def get_stats():
         "active_hesitate": db.active_hesitate_items(),
         "expired_quarantine": db.expired_quarantine_items(),
     }
+
+
+# ---------- meals（三餐推荐）----------
+
+
+@app.get("/api/meals")
+async def get_meals(date: Optional[str] = None):
+    """当日三餐（无则幂等生成）；今日晚餐首次生成时补一句 LLM 小贴士（可降级）。"""
+    if date and not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+        raise HTTPException(422, "date 格式应为 yyyy-mm-dd")
+    try:
+        day = meals.ensure_day(date)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    dinner = day["meals"].get("dinner")
+    if not date and dinner and dinner.get("recipe") and dinner.get("note") is None:
+        tip = await meals.dinner_tip(dinner["recipe"])
+        db.update_meal_note(dinner["id"], tip)
+        dinner["note"] = tip
+    return day
+
+
+@app.get("/api/meals/week")
+async def get_meals_week(start: Optional[str] = None):
+    try:
+        return meals.week(start)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.post("/api/meals/reroll")
+async def post_meal_reroll(body: MealRerollIn):
+    if body.meal_type not in meals.MEAL_ORDER:
+        raise HTTPException(422, "meal_type 必须为 breakfast/lunch/dinner")
+    try:
+        return meals.reroll(body.date, body.meal_type)
+    except meals.BentoLocked:
+        raise HTTPException(409, "bento_locked")
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.patch("/api/meals/{meal_plan_id}")
+async def patch_meal_status(meal_plan_id: int, body: MealStatusPatch):
+    plan = db.update_meal_status(meal_plan_id, body.status)
+    if not plan:
+        raise HTTPException(404, "餐计划不存在")
+    return plan
+
+
+# ---------- grocery（盒马买菜清单）----------
+
+
+@app.get("/api/grocery")
+async def get_grocery(days: int = 3):
+    if not 1 <= days <= 7:
+        raise HTTPException(422, "days 取值 1~7")
+    return meals.grocery(days)
+
+
+@app.patch("/api/grocery/{item_id}")
+async def patch_grocery(item_id: int, body: GroceryCheckPatch):
+    if not db.toggle_grocery(item_id, body.checked):
+        raise HTTPException(404, "清单项不存在")
+    return {"ok": True, "id": item_id, "checked": body.checked}
+
+
+@app.delete("/api/grocery")
+async def delete_grocery(bought: bool = True):
+    """采购完成：清空全部已勾选项。"""
+    return {"ok": True, "deleted": db.clear_checked_grocery()}
 
 
 # ---------- SSE：/api/chat（视觉→Agent→工具→事件流，§5.4）----------

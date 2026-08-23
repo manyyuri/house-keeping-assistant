@@ -121,3 +121,18 @@ class LLMSettingsIn(BaseModel):
 class LLMTestIn(BaseModel):
     scope: str  # vision | agent
     endpoint: Optional[LLMEndpointIn] = None
+
+
+# ---------- meals ----------
+
+class MealRerollIn(BaseModel):
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    meal_type: str  # breakfast | lunch | dinner
+
+
+class MealStatusPatch(BaseModel):
+    status: str = Field(pattern="^(planned|eaten|skipped)$")
+
+
+class GroceryCheckPatch(BaseModel):
+    checked: bool
