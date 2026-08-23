@@ -422,6 +422,14 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
                 {it.name}×{it.quantity}
               </Tag>
             ))}
+            {v.suspected?.map((it) => (
+              <Tag
+                key={it.name}
+                style={{ marginTop: 4, borderStyle: 'dashed', color: 'var(--ink-soft, #6b7a70)' }}
+              >
+                待确认·{it.name}×{it.quantity}
+              </Tag>
+            ))}
           </div>
         ))}
         {m.plan && <PlanCard plan={m.plan} onGoTasks={onGoTasks} />}

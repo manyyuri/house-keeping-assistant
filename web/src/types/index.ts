@@ -134,6 +134,7 @@ export interface VisionDonePayload {
   room: string;
   messiness: 'low' | 'medium' | 'high';
   items: { name: string; category: string; quantity: number }[];
+  suspected?: { name: string; category: string; quantity: number }[];
   degraded: boolean;
 }
 
