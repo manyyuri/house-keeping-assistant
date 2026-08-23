@@ -117,6 +117,8 @@ curl -X POST localhost:8000/api/settings/llm/test -H 'Content-Type: application/
 | 降级 | Ollama 不可达时提示"请先启动 Ollama 并拉取模型"，视觉非 JSON 输出自动降级 |
 | 云端 API | 设置弹窗可切换视觉/Agent 至云端（OpenAI 兼容），保存即生效；key 错误/模型名错/断网均有中文错误提示 |
 | 混合模式 | 视觉本地 + Agent 云端（或反向）均可出计划；断舍离评分始终来自 rules.py |
+| 二段式识别 | 每张照片两遍扫描：①全局逐一识别 ②小物件专项补扫，新增项标「待确认」，Agent 先向用户确认再入库（knowledge/vision-enhancement）；`VISION_TWO_PASS=0` 可关 |
+| 回归测试 | `.venv/bin/python -m server.test_db`（存储层）、`.venv/bin/python -m server.test_vision`（识别纯函数） |
 
 ## 开发调试
 
