@@ -83,6 +83,74 @@ body {
   }
 }
 
+/* ---- 任务模式条（相机模式条语汇）：选中项青竹绿 + 顶部指示圆点 ---- */
+.mode-strip {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(233, 230, 222, 0.45);
+}
+
+.mode-strip-item {
+  appearance: none;
+  border: none;
+  background: transparent;
+  position: relative;
+  flex: 1;
+  max-width: 128px;
+  min-height: 40px;
+  border-radius: 9px;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgba(38, 51, 44, 0.6);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    color 0.18s ease,
+    transform 0.12s ease;
+}
+
+.mode-strip-item::before {
+  /* 选中指示圆点（相机模式指示符） */
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--pine);
+  transform: translateX(-50%) scale(0);
+  transition: transform 0.18s ease;
+}
+
+.mode-strip-item[aria-checked='true'] {
+  color: var(--pine);
+  font-weight: 600;
+}
+
+.mode-strip-item[aria-checked='true']::before {
+  transform: translateX(-50%) scale(1);
+}
+
+.mode-strip-item:active {
+  transform: scale(0.96);
+}
+
+.mode-strip-item:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 1px;
+}
+
+/* 拍照按钮：青竹绿实底小快门，与空态主视觉呼应 */
+.chat-camera-btn.ant-btn {
+  background: var(--pine);
+  color: #fff;
+  border-radius: 12px;
+}
+
 /* ---- 空态：快门主视觉（本页签名元素）---- */
 .chat-empty {
   height: 100%;
@@ -386,7 +454,6 @@ body {
   font-size: 12px;
 }
 
-
 /* 展开后的收起按钮：箭头朝上 */
 .md-expand-btn.md-collapse-mode::before {
   content: '▴ ';
@@ -404,5 +471,10 @@ body {
 
   .shutter-flash {
     display: none;
+  }
+
+  .mode-strip-item,
+  .mode-strip-item::before {
+    transition: none;
   }
 }

@@ -52,6 +52,41 @@ const MESSINESS_LABEL: Record<string, { text: string; color: string }> = {
   high: { text: '混乱', color: 'red' },
 };
 
+/** 任务类型：纯照片发送（未输入文字）时自动带的提示词 */
+type TaskMode = 'organize' | 'clean' | 'stats';
+
+const TASK_PROMPTS: Record<TaskMode, string> = {
+  organize: '请根据照片帮我按断舍离的方法整理',
+  clean: '请根据照片评估这个区域的清洁重点，生成清洁计划与任务清单',
+  stats: '请识别照片中的物品并入库，然后统计数量、类别和保留/待定/舍弃分布',
+};
+
+const TASK_OPTIONS: { value: TaskMode; label: string }[] = [
+  { value: 'organize', label: '整理' },
+  { value: 'clean', label: '清洁' },
+  { value: 'stats', label: '物品统计' },
+];
+
+/** 任务模式条（相机模式条语汇）：纯照片发送时按选中模式自动带提示词 */
+function ModeStrip({ value, onChange }: { value: TaskMode; onChange: (v: TaskMode) => void }) {
+  return (
+    <div className="mode-strip" role="radiogroup" aria-label="任务类型">
+      {TASK_OPTIONS.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={value === o.value}
+          className="mode-strip-item"
+          onClick={() => onChange(o.value)}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 let msgSeq = 0;
 const nextId = () => `local-${Date.now()}-${msgSeq++}`;
 
@@ -70,6 +105,7 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [generating, setGenerating] = useState(false);
   const [awaitingPhotos, setAwaitingPhotos] = useState(false);
+  const [taskMode, setTaskMode] = useState<TaskMode>('organize');
   const [inputValue, setInputValue] = useState('');
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [flashKey, setFlashKey] = useState(0);
@@ -283,8 +319,9 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
         .filter((f) => f.status === 'done')
         .map((f) => (f.response as unknown as PhotoUploadResult)?.photoId)
         .filter((x): x is number => typeof x === 'number');
-      // 纯照片发送：未输入文字时补默认提示词，后端要求 message 非空
-      const finalText = text.trim() || (photoIds.length ? '请根据照片帮我按断舍离的方法整理' : '');
+      // 纯照片发送：未输入文字时按所选任务类型补提示词（后端要求 message 非空）；
+      // 用户输入了文字则以文字为准，不叠加模板
+      const finalText = text.trim() || (photoIds.length ? TASK_PROMPTS[taskMode] : '');
       if (!finalText) return;
 
       const assistantId = nextId();
@@ -346,7 +383,7 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
         wakeLockRef.current = null;
       }
     },
-    [activeId, handleEvent, patchAssistant],
+    [activeId, handleEvent, patchAssistant, taskMode],
   );
 
   const stop = useCallback(() => {
@@ -418,7 +455,8 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
   const hasFailed = fileList.some((f) => f.status === 'error');
   const uploadingCount = fileList.filter((f) => f.status === 'uploading').length;
   const doneCount = fileList.filter((f) => f.status === 'done').length;
-  const showHeader = !isMobile || fileList.length > 0;
+  // 移动端无照片时不占位（拖拽/占位是桌面 affordance）；模式条始终在
+  const showAttachments = !isMobile || fileList.length > 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
@@ -490,12 +528,12 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
           onCancel={stop}
           onSubmit={send}
           onPasteFile={(files) => addFiles(Array.from(files))}
-          placeholder="描述你的整理需求，如：帮我按断舍离整理这个衣柜"
+          placeholder="补充说明（可选）"
           prefix={
             <>
               <Button
                 type="text"
-                className="chat-tool-btn"
+                className="chat-tool-btn chat-camera-btn"
                 icon={<CameraOutlined />}
                 onClick={() => cameraInputRef.current?.click()}
                 aria-label="拍照"
@@ -512,8 +550,9 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
             </>
           }
           header={
-            showHeader ? (
-              <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <ModeStrip value={taskMode} onChange={setTaskMode} />
+              {showAttachments && (
                 <Attachments
                   accept="image/*"
                   multiple
@@ -525,6 +564,7 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
                   }}
                   placeholder={{ icon: <PictureOutlined />, title: '添加照片（点击或拖拽）' }}
                 />
+              )}
                 {uploadingCount > 0 && (
                   <Text type="secondary" style={{ fontSize: 12, marginTop: 2, display: 'block' }}>
                     照片上传中 {doneCount}/{fileList.length}…
@@ -535,8 +575,7 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
                     重试失败照片
                   </Button>
                 )}
-              </>
-            ) : false
+            </div>
           }
         />
       </div>
