@@ -10,7 +10,15 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ConfigProvider
       locale={zhCN}
-      theme={{ token: { colorPrimary: '#7FB77E', borderRadius: 10 } }}
+      theme={{
+        token: {
+          colorPrimary: '#7FB77E',
+          borderRadius: 10,
+          colorBgLayout: '#FAF9F6',
+          colorTextBase: '#26332C',
+          colorBorderSecondary: '#E9E6DE',
+        },
+      }}
     >
       <AntApp>
         <App />

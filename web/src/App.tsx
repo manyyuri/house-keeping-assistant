@@ -136,9 +136,9 @@ export default function App() {
 
   const tabs = [
     { key: 'chat', label: '对话', icon: <MessageOutlined />, children: <ChatPage onGoTasks={() => setTab('tasks')} /> },
-    { key: 'tasks', label: '任务看板', icon: <UnorderedListOutlined />, children: <TasksPage /> },
-    { key: 'items', label: '物品库', icon: <ContainerOutlined />, children: <ItemsPage /> },
-    { key: 'stats', label: '成果统计', icon: <BarChartOutlined />, children: <StatsPage /> },
+    { key: 'tasks', label: isMobile ? '任务' : '任务看板', icon: <UnorderedListOutlined />, children: <TasksPage /> },
+    { key: 'items', label: isMobile ? '物品' : '物品库', icon: <ContainerOutlined />, children: <ItemsPage /> },
+    { key: 'stats', label: isMobile ? '成果' : '成果统计', icon: <BarChartOutlined />, children: <StatsPage /> },
   ];
 
   return (
@@ -154,10 +154,14 @@ export default function App() {
               padding: '0 12px',
               height: 48,
               lineHeight: '48px',
+              borderBottom: '1px solid var(--mist)',
             }}
           >
-            <Button type="text" icon={<MenuOutlined />} onClick={() => setDrawerOpen(true)} />
-            <Typography.Text strong>断舍离整理助手</Typography.Text>
+            <Button type="text" icon={<MenuOutlined />} onClick={() => setDrawerOpen(true)} aria-label="对话列表" />
+            <span className="brand">
+              <i className="brand-seal">断</i>
+              断舍离整理助手
+            </span>
             <span style={{ flex: 1 }} />
             <Button
               type="text"
@@ -185,17 +189,37 @@ export default function App() {
           </Drawer>
         </>
       ) : (
-        <Sider width={260} theme="light" style={{ borderRight: '1px solid #f0f0f0' }}>
-          <ConversationList onOpenSettings={() => setSettingsOpen(true)} />
+        <Sider width={260} theme="light" style={{ borderRight: '1px solid var(--mist)' }}>
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '14px 16px 0' }}>
+              <span className="brand">
+                <i className="brand-seal">断</i>
+                断舍离整理助手
+              </span>
+            </div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <ConversationList onOpenSettings={() => setSettingsOpen(true)} />
+            </div>
+          </div>
         </Sider>
       )}
       <Layout>
-        <Content style={{ display: 'flex', flexDirection: 'column', minHeight: 0, background: '#fff' }}>
+        <Content style={{ display: 'flex', flexDirection: 'column', minHeight: 0, background: 'transparent' }}>
           <Tabs
             activeKey={tab}
             onChange={setTab}
             items={tabs}
-            tabBarStyle={{ margin: 0, padding: '0 16px' }}
+            className={isMobile ? 'mobile-tabs' : undefined}
+            tabBarStyle={
+              isMobile
+                ? {
+                    margin: 0,
+                    padding: '2px 0 calc(4px + env(safe-area-inset-bottom))',
+                    background: '#fff',
+                    borderTop: '1px solid var(--mist)',
+                  }
+                : { margin: 0, padding: '0 16px' }
+            }
             style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
             tabPlacement={isMobile ? 'bottom' : 'top'}
             destroyOnHidden={false}

@@ -1,11 +1,12 @@
-/** 对话页（核心）：X Bubble.List + Sender + Attachments + SSE 流式。 */
+/** 对话页（核心）：X Bubble.List + Sender + Attachments + SSE 流式。
+ *  移动端以「快门」为主入口：空态大按钮直接调相机，发送自动等待照片上传完成。 */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   App as AntApp,
   Button,
-  Empty,
+  Grid,
   Image,
   Tag,
   Typography,
@@ -20,7 +21,6 @@ import {
 } from '@ant-design/icons';
 import { Attachments, Bubble, Sender } from '@ant-design/x';
 import type { BubbleListProps } from '@ant-design/x/es/bubble/interface';
-import type { AttachmentsRef } from '@ant-design/x/es/attachments';
 import type { UploadFile, UploadProps } from 'antd';
 import * as api from '../../api';
 import { useBusinessStore, useConversationStore } from '../../stores';
@@ -63,17 +63,30 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
   const { message: antdMessage } = AntApp.useApp();
   const activeId = useConversationStore((s) => s.activeId);
   const bumpVersion = useBusinessStore((s) => s.bumpVersion);
+  const screens = Grid.useBreakpoint();
+  const isMobile = !screens.md;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [awaitingPhotos, setAwaitingPhotos] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [flashKey, setFlashKey] = useState(0);
   const fileMapRef = useRef<Map<string, File>>(new Map());
+  // 进行中的上传 promise：发送前等它们落地，避免照片被静默漏发
+  const pendingRef = useRef<Map<string, Promise<void>>>(new Map());
+  const waitTokenRef = useRef<{ cancelled: boolean } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   // Wake Lock：生成期间保持屏幕常亮，避免 iOS 锁屏掐断 SSE
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
-  const attRef = useRef<AttachmentsRef>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const albumInputRef = useRef<HTMLInputElement>(null);
+  // fileList 的 ref 镜像：await 上传后再读最新状态，避免闭包过期
+  const fileListRef = useRef<UploadFile[]>([]);
+
+  useEffect(() => {
+    fileListRef.current = fileList;
+  }, [fileList]);
 
   // 切换会话时加载历史
   useEffect(() => {
@@ -109,29 +122,36 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
   // ---------- 上传（压缩 → /api/upload → photoId）----------
 
   const uploadOne = useCallback(async (uid: string, file: File) => {
-    try {
-      const compressed = await api.compressImage(file);
-      const [res] = await api.uploadPhotos([compressed]);
-      setFileList((fl) =>
-        fl.map((x) =>
-          x.uid === uid
-            ? { ...x, status: 'done' as const, thumbUrl: res.url, response: res as unknown as UploadFile['response'] }
-            : x,
-        ),
-      );
-    } catch (e) {
-      setFileList((fl) => fl.map((x) => (x.uid === uid ? { ...x, status: 'error' as const } : x)));
-      antdMessage.error(`上传失败：${e instanceof Error ? e.message : e}`);
-    }
+    const task = (async () => {
+      try {
+        const compressed = await api.compressImage(file);
+        const [res] = await api.uploadPhotos([compressed]);
+        setFileList((fl) =>
+          fl.map((x) =>
+            x.uid === uid
+              ? { ...x, status: 'done' as const, thumbUrl: res.url, response: res as unknown as UploadFile['response'] }
+              : x,
+          ),
+        );
+      } catch (e) {
+        setFileList((fl) => fl.map((x) => (x.uid === uid ? { ...x, status: 'error' as const } : x)));
+        antdMessage.error(`上传失败：${e instanceof Error ? e.message : e}`);
+      }
+    })();
+    pendingRef.current.set(uid, task);
+    await task.finally(() => pendingRef.current.delete(uid));
   }, []);
 
   const addFiles = useCallback(
-    async (files: File[]) => {
+    (rawFiles: File[]) => {
+      const files = rawFiles.filter((f) => f.type.startsWith('image/'));
+      if (!files.length) return;
       const remain = 4 - fileList.length;
       if (remain <= 0) {
         antdMessage.warning('一次最多携带 4 张照片');
         return;
       }
+      setFlashKey((k) => k + 1); // 快门闪光：照片进入的一瞬
       for (const f of files.slice(0, remain)) {
         const uid = `up-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         fileMapRef.current.set(uid, f);
@@ -247,7 +267,18 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
   const send = useCallback(
     async (text: string) => {
       if (!activeId) return;
-      const photoIds = fileList
+      // 有照片还在上传：等它们落地再发送（局域网很快），修复「抢跑漏发照片」
+      if (pendingRef.current.size > 0) {
+        setAwaitingPhotos(true);
+        const token = { cancelled: false };
+        waitTokenRef.current = token;
+        await Promise.allSettled(Array.from(pendingRef.current.values()));
+        waitTokenRef.current = null;
+        setAwaitingPhotos(false);
+        if (token.cancelled) return;
+      }
+      const fl = fileListRef.current;
+      const photoIds = fl
         .filter((f) => f.status === 'done')
         .map((f) => (f.response as unknown as PhotoUploadResult)?.photoId)
         .filter((x): x is number => typeof x === 'number');
@@ -264,7 +295,7 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
           content: finalText,
           thoughts: [],
           status: 'done',
-          photos: fileList
+          photos: fl
             .filter((f) => f.status === 'done')
             .map((f) => {
               const res = f.response as unknown as PhotoUploadResult;
@@ -314,11 +345,12 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
         wakeLockRef.current = null;
       }
     },
-    [activeId, fileList, handleEvent, patchAssistant],
+    [activeId, handleEvent, patchAssistant],
   );
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
+    if (waitTokenRef.current) waitTokenRef.current.cancelled = true;
   }, []);
 
   // ---------- 渲染 ----------
@@ -330,7 +362,7 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
           {m.photos?.length ? (
             <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
               {m.photos.map((p) => (
-                <Image key={p.photoId} src={p.url} alt="用户上传照片" width={64} height={64} style={{ objectFit: 'cover', borderRadius: 8 }} />
+                <Image key={p.photoId} src={p.url} alt="用户上传照片" width={72} height={72} style={{ objectFit: 'cover', borderRadius: 10 }} />
               ))}
             </div>
           ) : null}
@@ -383,9 +415,13 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
   }));
 
   const hasFailed = fileList.some((f) => f.status === 'error');
+  const uploadingCount = fileList.filter((f) => f.status === 'uploading').length;
+  const doneCount = fileList.filter((f) => f.status === 'done').length;
+  const showHeader = !isMobile || fileList.length > 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+      {flashKey > 0 && <span key={flashKey} className="shutter-flash" aria-hidden="true" />}
       <div style={{ flex: 1, minHeight: 0, padding: '12px 8px' }}>
         {messages.length ? (
           <Bubble.List
@@ -397,17 +433,26 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
             }}
           />
         ) : (
-          <Empty
-            style={{ marginTop: 64 }}
-            image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description={
-              <span>
-                拍一张衣柜、杂物堆或房间角落的照片
-                <br />
-                <Text type="secondary">我来按断舍离帮你评估物品、生成整理计划</Text>
-              </span>
-            }
-          />
+          <div className="chat-empty">
+            <div className="chat-empty-greeting">今天，想放下什么？</div>
+            <button
+              type="button"
+              className="shutter-btn"
+              onClick={() => cameraInputRef.current?.click()}
+              aria-label="拍照开始整理"
+            >
+              <span className="shutter-btn-inner" />
+            </button>
+            <div className="chat-empty-hint">对准衣柜或杂物堆，按下快门</div>
+            <Button type="link" size="small" onClick={() => albumInputRef.current?.click()}>
+              从相册选择
+            </Button>
+            {!isMobile && (
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                也可以把照片拖进输入框，或直接粘贴
+              </Text>
+            )}
+          </div>
         )}
       </div>
 
@@ -422,44 +467,75 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
           onChange={(e) => {
             const files = Array.from(e.target.files ?? []);
             e.target.value = '';
-            if (files.length) void addFiles(files);
+            if (files.length) addFiles(files);
+          }}
+        />
+        <input
+          ref={albumInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            e.target.value = '';
+            if (files.length) addFiles(files);
           }}
         />
         <Sender
           value={inputValue}
           onChange={setInputValue}
-          loading={generating}
+          loading={generating || awaitingPhotos}
           onCancel={stop}
           onSubmit={send}
+          onPasteFile={(files) => addFiles(Array.from(files))}
           placeholder="描述你的整理需求，如：帮我按断舍离整理这个衣柜"
           prefix={
-            <Button
-              type="text"
-              icon={<CameraOutlined />}
-              onClick={() => cameraInputRef.current?.click()}
-              title="拍照上传"
-            />
+            <>
+              <Button
+                type="text"
+                className="chat-tool-btn"
+                icon={<CameraOutlined />}
+                onClick={() => cameraInputRef.current?.click()}
+                aria-label="拍照"
+                title="拍照"
+              />
+              <Button
+                type="text"
+                className="chat-tool-btn"
+                icon={<PictureOutlined />}
+                onClick={() => albumInputRef.current?.click()}
+                aria-label="从相册选择"
+                title="从相册选择"
+              />
+            </>
           }
           header={
-            <>
-              <Attachments
-                ref={attRef}
-                accept="image/*"
-                multiple
-                items={fileList}
-                beforeUpload={beforeUpload}
-                onChange={({ fileList: fl }) => {
-                  // 移除时同步清理
-                  setFileList(fl.filter((f) => f.status !== 'removed'));
-                }}
-                placeholder={{ icon: <PictureOutlined />, title: '添加照片（相册）' }}
-              />
-              {hasFailed && (
-                <Button size="small" icon={<ReloadOutlined />} onClick={retryFailed} style={{ marginTop: 4 }}>
-                  重试失败照片
-                </Button>
-              )}
-            </>
+            showHeader ? (
+              <>
+                <Attachments
+                  accept="image/*"
+                  multiple
+                  items={fileList}
+                  beforeUpload={beforeUpload}
+                  onChange={({ fileList: fl }) => {
+                    // 移除时同步清理
+                    setFileList(fl.filter((f) => f.status !== 'removed'));
+                  }}
+                  placeholder={{ icon: <PictureOutlined />, title: '添加照片（点击或拖拽）' }}
+                />
+                {uploadingCount > 0 && (
+                  <Text type="secondary" style={{ fontSize: 12, marginTop: 2, display: 'block' }}>
+                    照片上传中 {doneCount}/{fileList.length}…
+                  </Text>
+                )}
+                {hasFailed && (
+                  <Button size="small" icon={<ReloadOutlined />} onClick={retryFailed} style={{ marginTop: 4 }}>
+                    重试失败照片
+                  </Button>
+                )}
+              </>
+            ) : false
           }
         />
       </div>

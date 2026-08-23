@@ -1,3 +1,14 @@
+/* ---- 设计令牌：和纸白 × 青竹绿 × 朱印 ---- */
+:root {
+  --paper: #faf9f6;
+  --ink: #26332c;
+  --pine: #3e6b52;
+  --leaf: #7fb77e;
+  --mist: #e9e6de;
+  --seal: #b3402a;
+  --serif: 'Songti SC', 'Noto Serif SC', 'STSong', 'SimSun', serif;
+}
+
 html,
 body,
 #root {
@@ -11,16 +22,164 @@ body {
     -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB',
     'Microsoft YaHei', sans-serif;
   -webkit-font-smoothing: antialiased;
+  background: var(--paper);
+  color: var(--ink);
 }
 
-/* 对话输入区吸底（iPhone 键盘弹起不被遮挡） */
+:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+/* ---- 品牌印记（宋体 + 朱印）---- */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.brand-seal {
+  font-style: normal;
+  font-family: var(--serif);
+  background: var(--seal);
+  color: #fff;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  display: inline-grid;
+  place-items: center;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 400;
+}
+
+/* ---- 对话输入区吸底（iPhone 键盘弹起不被遮挡）---- */
 .chat-input-area {
   position: sticky;
   bottom: 0;
   background: #fff;
   padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--mist);
+  box-shadow: 0 -6px 18px rgba(38, 51, 44, 0.04);
   z-index: 10;
+}
+
+/* 触屏设备：拍照/相册按钮放大到 44px 触达标准 */
+@media (pointer: coarse) {
+  .chat-tool-btn.ant-btn {
+    min-width: 44px;
+    height: 44px;
+    font-size: 20px;
+    padding-inline: 10px;
+  }
+}
+
+/* ---- 空态：快门主视觉（本页签名元素）---- */
+.chat-empty {
+  height: 100%;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  text-align: center;
+}
+
+.chat-empty-greeting {
+  font-family: var(--serif);
+  font-size: 21px;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.chat-empty-hint {
+  font-size: 13px;
+  color: rgba(38, 51, 44, 0.55);
+  margin-top: -10px;
+}
+
+.shutter-btn {
+  appearance: none;
+  border: 4px solid var(--pine);
+  background: transparent;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  animation: shutter-breathe 2.8s ease-in-out infinite;
+}
+
+.shutter-btn-inner {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: var(--pine);
+  transition: transform 0.16s ease;
+}
+
+.shutter-btn:active .shutter-btn-inner {
+  transform: scale(0.82);
+}
+
+.shutter-btn:focus-visible {
+  outline: 3px solid var(--leaf);
+  outline-offset: 5px;
+}
+
+@keyframes shutter-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(127, 183, 126, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 16px rgba(127, 183, 126, 0);
+  }
+}
+
+/* 快门闪光：照片进入的一瞬 */
+.shutter-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  animation: flash-fade 0.45s ease-out forwards;
+}
+
+@keyframes flash-fade {
+  0% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ---- 移动端底部 Tab 紧凑化 ---- */
+.mobile-tabs .ant-tabs-tab {
+  margin: 0 6px;
+  padding: 7px 0;
+}
+
+.mobile-tabs .ant-tabs-tab .ant-tabs-tab-btn {
+  font-size: 12.5px;
+}
+
+.mobile-tabs .ant-tabs-tab .anticon {
+  font-size: 17px;
+  margin-inline-end: 5px;
+}
+
+.mobile-tabs > .ant-tabs-nav::before {
+  display: none;
 }
 
 /* antd Tabs 内容区撑满高度供对话页滚动 */
@@ -32,4 +191,19 @@ body {
 .ant-tabs-tabpane {
   height: 100%;
   overflow: auto;
+}
+
+/* ---- 动效降级（prefers-reduced-motion）---- */
+@media (prefers-reduced-motion: reduce) {
+  .shutter-btn {
+    animation: none;
+  }
+
+  .shutter-btn-inner {
+    transition: none;
+  }
+
+  .shutter-flash {
+    display: none;
+  }
 }
