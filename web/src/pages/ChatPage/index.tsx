@@ -114,6 +114,8 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
   const pendingRef = useRef<Map<string, Promise<void>>>(new Map());
   const waitTokenRef = useRef<{ cancelled: boolean } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // 发送防重入：一次点击/回车只发一条（双击、回车与点击竞态时直接忽略）
+  const sendingRef = useRef(false);
   // Wake Lock：生成期间保持屏幕常亮，避免 iOS 锁屏掐断 SSE
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -303,7 +305,8 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
 
   const send = useCallback(
     async (text: string) => {
-      if (!activeId) return;
+      if (!activeId || sendingRef.current) return;
+      sendingRef.current = true;
       // 有照片还在上传：等它们落地再发送（局域网很快），修复「抢跑漏发照片」
       if (pendingRef.current.size > 0) {
         setAwaitingPhotos(true);
@@ -312,7 +315,10 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
         await Promise.allSettled(Array.from(pendingRef.current.values()));
         waitTokenRef.current = null;
         setAwaitingPhotos(false);
-        if (token.cancelled) return;
+        if (token.cancelled) {
+          sendingRef.current = false;
+          return;
+        }
       }
       const fl = fileListRef.current;
       const photoIds = fl
@@ -322,7 +328,10 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
       // 纯照片发送：未输入文字时按所选任务类型补提示词（后端要求 message 非空）；
       // 用户输入了文字则以文字为准，不叠加模板
       const finalText = text.trim() || (photoIds.length ? TASK_PROMPTS[taskMode] : '');
-      if (!finalText) return;
+      if (!finalText) {
+        sendingRef.current = false;
+        return;
+      }
 
       const assistantId = nextId();
       setMessages((ms) => [
@@ -374,6 +383,7 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
         }
       } finally {
         setGenerating(false);
+        sendingRef.current = false;
         abortRef.current = null;
         try {
           await wakeLockRef.current?.release();
@@ -540,6 +550,9 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
           suffix={(_, { components }) => {
             // 自定义发送按钮：有照片（已上传完）即可发送，不强制输入文字。
             // Sender 默认按钮在输入为空时禁用，与拍照免打字的主路径冲突。
+            // 注意：SendButton 点击时内置就会触发 onSubmit（ActionButton 内部先调
+            // context.onSend 再调外部 onClick），不能再挂 onClick 二次调用 send，
+            // 否则一次点击会把同一条消息（含照片）发送两遍。
             const SendBtn = components.SendButton as React.ComponentType<{
               className?: string;
               style?: React.CSSProperties;
@@ -554,7 +567,6 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
             return (
               <SendBtn
                 disabled={!canSend}
-                onClick={() => send(inputValue)}
                 style={{
                   background: canSend ? 'var(--pine)' : undefined,
                   borderColor: 'transparent',
