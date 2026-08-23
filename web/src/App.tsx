@@ -142,7 +142,7 @@ export default function App() {
   ];
 
   return (
-    <Layout style={{ height: '100vh' }}>
+    <Layout className="app-shell">
       {isMobile ? (
         <>
           <Header
@@ -203,7 +203,7 @@ export default function App() {
           </div>
         </Sider>
       )}
-      <Layout>
+      <Layout style={{ flex: 1, minHeight: 0 }}>
         <Content style={{ display: 'flex', flexDirection: 'column', minHeight: 0, background: 'transparent' }}>
           <Tabs
             activeKey={tab}

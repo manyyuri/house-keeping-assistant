@@ -24,6 +24,13 @@ body {
   -webkit-font-smoothing: antialiased;
   background: var(--paper);
   color: var(--ink);
+  overflow: hidden; /* 应用式布局：滚动只发生在 Tab 面板内部，页面本体不滚（保 Header 吸顶） */
+}
+
+/* 壳层高度：100vh 回退，支持 dvh 的浏览器用动态视口（iOS Safari 工具栏） */
+.app-shell {
+  height: 100vh;
+  height: 100dvh;
 }
 
 :focus-visible {
@@ -55,12 +62,12 @@ body {
   font-weight: 400;
 }
 
-/* ---- 对话输入区吸底（iPhone 键盘弹起不被遮挡）---- */
+/* ---- 对话输入区吸底（在面板滚动容器内；底部 Tab 栏自带 safe-area，此处不叠加）---- */
 .chat-input-area {
   position: sticky;
   bottom: 0;
   background: #fff;
-  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  padding: 8px 12px;
   border-top: 1px solid var(--mist);
   box-shadow: 0 -6px 18px rgba(38, 51, 44, 0.04);
   z-index: 10;
@@ -182,15 +189,41 @@ body {
   display: none;
 }
 
-/* antd Tabs 内容区撑满高度供对话页滚动 */
-.ant-tabs-content-holder,
-.ant-tabs-content {
+/* ---- antd Tabs v6 高度链 ----
+   v6 结构：.ant-tabs > [.ant-tabs-nav, .ant-tabs-body-holder > .ant-tabs-body
+   > .ant-tabs-content(=tabpanel)]。.ant-tabs-body 默认按内容自然撑高且
+   overflow:visible，必须 height:100% + 面板 overflow:auto，否则长内容穿透
+   到页面：溢出滚动（Header 被滚走）+ 从底部 Tab 栏底下穿过被遮挡。 */
+.ant-tabs {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.ant-tabs-body-holder {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.ant-tabs-body {
   height: 100%;
 }
 
-.ant-tabs-tabpane {
+.ant-tabs-content {
   height: 100%;
   overflow: auto;
+}
+
+/* ---- X v2 Bubble.List 高度链 ----
+   scroll-box 是真正的滚动器（autoscroll），但高度默认为内容自然高度，
+   会撑破 wrapper 向下穿透（面板被迫滚动 + sticky 输入框错位）。
+   约束到 wrapper 高度后列表内部滚动，面板不再滚。 */
+.ant-bubble-list {
+  height: 100%;
+}
+
+.ant-bubble-list-scroll-box {
+  height: 100%;
 }
 
 /* ---- 助手回复 markdown 排版（手机阅读优先）---- */
