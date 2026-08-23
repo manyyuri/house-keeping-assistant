@@ -118,7 +118,8 @@ curl -X POST localhost:8000/api/settings/llm/test -H 'Content-Type: application/
 | 云端 API | 设置弹窗可切换视觉/Agent 至云端（OpenAI 兼容），保存即生效；key 错误/模型名错/断网均有中文错误提示 |
 | 混合模式 | 视觉本地 + Agent 云端（或反向）均可出计划；断舍离评分始终来自 rules.py |
 | 二段式识别 | 每张照片两遍扫描：①全局逐一识别 ②小物件专项补扫，新增项标「待确认」，Agent 先向用户确认再入库（knowledge/vision-enhancement）；`VISION_TWO_PASS=0` 可关 |
-| 回归测试 | `.venv/bin/python -m server.test_db`（存储层）、`.venv/bin/python -m server.test_vision`（识别纯函数） |
+| 回归测试 | `.venv/bin/python -m server.test_db`（存储层）、`.venv/bin/python -m server.test_vision`（识别纯函数）、`.venv/bin/python -m server.test_meal_rules`（三餐规则+种子库门禁） |
+| 今日三餐 | 打开「今日三餐」页自动生成今天+明天菜单（拳头法则规则引擎，离线可用）；晚餐后顺手做明日便当（bento 锁：制作日 19:00 后禁换）；换菜自动同步盒马五分区买菜清单；对话可问“今天吃什么”、说“换个晚餐” |
 
 ## 开发调试
 
@@ -146,24 +147,28 @@ curl -N -G "localhost:8000/api/chat" \
 ## 目录结构
 
 ```
-├── knowledge/duansheli/   # 断舍离理论知识库（cheatsheet 进运行时提示词，其余供维护查阅）
+├── knowledge/
+│   ├── duansheli/         # 断舍离理论知识库（cheatsheet 进运行时提示词，其余供维护查阅）
+│   └── recipes/           # 三餐种子菜谱库（39 道，含带饭友好标准）
 ├── scripts/               # 联调工具
 │   └── mock_openai_server.py  # mock 云端 API（vision 固定 JSON + agent 剧本 tool_calls）
 ├── server/                # FastAPI 后端
 │   ├── main.py            # REST + /api/chat SSE 管道 + 模型设置三端点
-│   ├── db.py              # SQLite 建表 + DAO
+│   ├── db.py              # SQLite 建表 + DAO（物品/计划/任务/菜谱/餐计划/买菜清单）
+│   ├── meals.py           # 三餐推荐引擎（幂等生成/换菜/清单聚合，LLM 仅小贴士可降级）
 │   ├── llm_providers.py   # LLM 运行时配置（ENV > config.json > 默认）+ 掩码/锁定
 │   ├── ollama_client.py   # 模型访问路由层（对外签名不变）
 │   ├── ollama_provider.py # Ollama adapter
 │   ├── openai_provider.py # OpenAI 兼容 adapter（消息协议转换 + 错误映射）
 │   ├── vision.py          # 视觉识别 + 容错解析（provider 无关）
 │   ├── agent.py           # Agent 循环（≤5 轮，provider 无关）
-│   ├── tools.py           # 六工具（入库/判定/计划/任务/查询/状态）
+│   ├── tools.py           # 八工具（入库/判定/计划/任务/查询/状态/三餐查询/换菜）
 │   ├── prompts.py         # 系统提示词（§8.1 全文 + cheatsheet）
 │   ├── rules.py           # 断舍离硬规则（评分/观察期）
+│   ├── meal_rules.py      # 拳头法则硬规则（餐模板/份量校验/轮换去重/带饭筛选）
 │   └── data/              # 运行时生成：app.db + photos/ + config.json（已 gitignore）
 └── web/                   # React 18 + antd 6 + @ant-design/x v2
-    └── src/pages/         # ChatPage（对话）/ TasksPage / ItemsPage / StatsPage / SettingsPage（模型设置弹窗）
+    └── src/pages/         # ChatPage（对话）/ MealsPage（今日三餐）/ TasksPage / ItemsPage / StatsPage / SettingsPage（模型设置弹窗）
 ```
 
 ## 断舍离方法论速览（内置规则来源）
