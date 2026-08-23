@@ -159,8 +159,8 @@ export default function App() {
           >
             <Button type="text" icon={<MenuOutlined />} onClick={() => setDrawerOpen(true)} aria-label="对话列表" />
             <span className="brand">
-              <i className="brand-seal">断</i>
-              断舍离整理助手
+              <i className="brand-seal">多</i>
+              Dobby 小精灵
             </span>
             <span style={{ flex: 1 }} />
             <Button
@@ -193,8 +193,8 @@ export default function App() {
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '14px 16px 0' }}>
               <span className="brand">
-                <i className="brand-seal">断</i>
-                断舍离整理助手
+                <i className="brand-seal">多</i>
+                Dobby 小精灵
               </span>
             </div>
             <div style={{ flex: 1, minHeight: 0 }}>
