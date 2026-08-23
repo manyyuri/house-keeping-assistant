@@ -131,14 +131,19 @@ def list_conversations() -> List[Dict[str, Any]]:
 
 
 def delete_conversation(conversation_id: int) -> bool:
-    """删除会话及其消息（照片/物品/计划独立于会话存在，不级联）。"""
+    """删除会话及其消息（照片/物品/计划独立于会话存在，不级联）。
+
+    注意删除顺序：messages 有指向 conversations 的外键且
+    PRAGMA foreign_keys = ON，必须先删子表再删父表，否则
+    sqlite3.IntegrityError → 接口 500。
+    """
     conn = get_conn()
     with _lock:
-        cur = conn.execute(
-            "DELETE FROM conversations WHERE id = ?", (conversation_id,)
-        )
         conn.execute(
             "DELETE FROM messages WHERE conversation_id = ?", (conversation_id,)
+        )
+        cur = conn.execute(
+            "DELETE FROM conversations WHERE id = ?", (conversation_id,)
         )
         conn.commit()
     return cur.rowcount > 0
