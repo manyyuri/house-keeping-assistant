@@ -386,6 +386,12 @@ body {
   font-size: 12px;
 }
 
+
+/* 展开后的收起按钮：箭头朝上 */
+.md-expand-btn.md-collapse-mode::before {
+  content: '▴ ';
+}
+
 /* ---- 动效降级（prefers-reduced-motion）---- */
 @media (prefers-reduced-motion: reduce) {
   .shutter-btn {

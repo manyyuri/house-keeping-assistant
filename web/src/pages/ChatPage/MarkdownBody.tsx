@@ -28,9 +28,14 @@ function MarkdownBody({ content, finished }: Props) {
       <div className="md-body">
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
       </div>
-      {collapsed && (
-        <button type="button" className="md-expand-btn" onClick={() => setExpanded(true)}>
-          展开全文（{content.length} 字）
+      {collapsible && (
+        <button
+          type="button"
+          className={`md-expand-btn${collapsed ? '' : ' md-collapse-mode'}`}
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+        >
+          {collapsed ? `展开全文（${content.length} 字）` : '收起'}
         </button>
       )}
     </div>
