@@ -356,6 +356,7 @@ async def _chat_stream(
                             "room": result.room,
                             "messiness": result.messiness,
                             "items": result.items,
+                            "suspected": result.suspected,
                             "degraded": result.degraded,
                         },
                     )

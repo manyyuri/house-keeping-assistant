@@ -64,9 +64,17 @@ def _read_cheatsheet() -> str:
     return path.read_text(encoding="utf-8")
 
 
+VISION_CONFIRM_RULE = (
+    "\n\n【视觉识别待确认规则】\n"
+    "照片摘要中的「待确认小物件」来自二遍补扫，置信度较低："
+    "在入库（save_items）之前，先向用户简要列出这些物品并确认是否真实存在；"
+    "用户确认的才入库，否认或未回应的忽略。不要主动编造摘要中不存在的物品。"
+)
+
+
 def build_system_prompt() -> str:
-    """拼装系统提示词：§8.1 全文 + 知识库速查表。"""
-    return PROMPT_BODY + "\n\n【断舍离速查表】\n" + _read_cheatsheet()
+    """拼装系统提示词：§8.1 全文 + 知识库速查表 + 视觉待确认规则。"""
+    return PROMPT_BODY + "\n\n【断舍离速查表】\n" + _read_cheatsheet() + VISION_CONFIRM_RULE
 
 
 # 启动时一次完成并缓存
