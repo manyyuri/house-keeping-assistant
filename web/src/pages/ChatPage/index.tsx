@@ -529,6 +529,33 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
           onSubmit={send}
           onPasteFile={(files) => addFiles(Array.from(files))}
           placeholder="补充说明（可选）"
+          suffix={(_, { components }) => {
+            // 自定义发送按钮：有照片（已上传完）即可发送，不强制输入文字。
+            // Sender 默认按钮在输入为空时禁用，与拍照免打字的主路径冲突。
+            const SendBtn = components.SendButton as React.ComponentType<{
+              className?: string;
+              style?: React.CSSProperties;
+              onClick?: () => void;
+              disabled?: boolean;
+            }>;
+            const photoReady = fileList.some((f) => f.status === 'done');
+            const canSend = (inputValue.trim().length > 0 || photoReady) && !generating && !awaitingPhotos;
+            if (generating || awaitingPhotos) {
+              return <components.LoadingButton onClick={stop} />;
+            }
+            return (
+              <SendBtn
+                disabled={!canSend}
+                onClick={() => send(inputValue)}
+                style={{
+                  background: canSend ? 'var(--pine)' : undefined,
+                  borderColor: 'transparent',
+                  color: canSend ? '#fff' : undefined,
+                  boxShadow: 'none',
+                }}
+              />
+            );
+          }}
           prefix={
             <>
               <Button
