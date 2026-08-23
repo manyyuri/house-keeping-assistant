@@ -837,6 +837,33 @@ body {
   overflow: hidden;
 }
 
+/* 加载失败占位 */
+
+.meal-error {
+  margin: 40px auto 0;
+  max-width: 340px;
+  text-align: center;
+  padding: 24px 16px;
+  background: #fff;
+  border: 1px dashed var(--mist);
+  border-radius: 12px;
+}
+
+.meal-error-title {
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.meal-error-desc {
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: rgba(38, 51, 44, 0.55);
+  margin-bottom: 14px;
+  word-break: break-all;
+}
+
 /* 吸底买菜条 */
 
 .grocery-bar {

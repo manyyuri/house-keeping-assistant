@@ -121,6 +121,7 @@ interface MealState {
   week: WeekDay[];
   grocery: GrocerySummary | null;
   loading: boolean;
+  error: string | null;
   rerolling: MealType | null;
   setView: (v: MealView) => Promise<void>;
   fetchDay: (date?: string) => Promise<void>;
@@ -138,6 +139,7 @@ export const useMealStore = create<MealState>((set, get) => ({
   week: [],
   grocery: null,
   loading: false,
+  error: null,
   rerolling: null,
   setView: async (v) => {
     set({ view: v });
@@ -148,17 +150,21 @@ export const useMealStore = create<MealState>((set, get) => ({
     }
   },
   fetchDay: async (date) => {
-    set({ loading: true });
+    set({ loading: true, error: null });
     try {
       set({ day: await api.getMeals(date) });
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : '加载失败' });
     } finally {
       set({ loading: false });
     }
   },
   fetchWeek: async () => {
-    set({ loading: true });
+    set({ loading: true, error: null });
     try {
       set({ week: await api.getWeekMeals() });
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : '加载失败' });
     } finally {
       set({ loading: false });
     }

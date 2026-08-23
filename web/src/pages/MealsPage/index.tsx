@@ -1,7 +1,7 @@
 /** 今日三餐页：今天/明天/本周三视图；今天=三张餐卡，本周=7 天缩略横滑。 */
 
 import { useEffect, useState } from 'react';
-import { App as AntApp, Segmented, Spin, Typography } from 'antd';
+import { App as AntApp, Button, Segmented, Spin, Typography } from 'antd';
 import type { MealPlan, MealType, WeekDay } from '../../types';
 import { useMealStore, type MealView } from '../../stores';
 import { fmtMD } from '../../utils/date';
@@ -13,6 +13,27 @@ const { Text } = Typography;
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner'];
 const MEAL_CHAR: Record<MealType, string> = { breakfast: '早', lunch: '午', dinner: '晚' };
+
+/** 常见加载错误转人话。 */
+function friendlyError(err: string): string {
+  if (err === 'Not Found') return '后端服务是旧版本（没有 /api/meals 路由），请重启：./start.sh stop && ./start.sh';
+  if (err === 'Failed to fetch') return '连不上后端服务，请确认服务已启动';
+  return err;
+}
+
+/** 加载失败占位：说明原因 + 一键重新生成。 */
+function LoadError({ view, error, onRetry }: { view: MealView; error: string; onRetry: () => void }) {
+  const label = view === 'week' ? '生成本周菜单' : view === 'tomorrow' ? '生成明日菜单' : '生成今日菜单';
+  return (
+    <div className="meal-error">
+      <div className="meal-error-title">菜单还没生成</div>
+      <div className="meal-error-desc">{friendlyError(error)}</div>
+      <Button type="primary" size="small" onClick={onRetry}>
+        {label}
+      </Button>
+    </div>
+  );
+}
 
 function headerTitle(view: MealView, day: DayMealsLike | null): string {
   if (view === 'week') return '本周菜单';
@@ -51,7 +72,7 @@ function WeekRow({ week }: { week: WeekDay[] }) {
 
 export default function MealsPage() {
   const { message } = AntApp.useApp();
-  const { day, week, view, loading, rerolling, grocery, setView, reroll, setStatus, fetchGrocery } =
+  const { day, week, view, loading, error, rerolling, grocery, setView, reroll, setStatus, fetchGrocery } =
     useMealStore();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -83,6 +104,8 @@ export default function MealsPage() {
   };
 
   const tomorrow = day?.tomorrow_preview;
+  const loadFailed = !!error && (view === 'week' ? week.length === 0 : !day);
+  const initialLoading = loading && (view === 'week' ? week.length === 0 : !day);
 
   return (
     <div className="meal-page">
@@ -100,10 +123,12 @@ export default function MealsPage() {
         />
       </header>
 
-      {loading && !day ? (
+      {initialLoading ? (
         <div style={{ textAlign: 'center', padding: '64px 0' }}>
           <Spin />
         </div>
+      ) : loadFailed ? (
+        <LoadError view={view} error={error!} onRetry={() => void setView(view)} />
       ) : view === 'week' ? (
         <WeekRow week={week} />
       ) : (
