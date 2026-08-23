@@ -1,0 +1,671 @@
+[
+  {
+    "name": "燕麦牛奶碗",
+    "meal_type": "breakfast",
+    "slots": [
+      {"slot": "粗粮", "kind": "staple", "fists": 1, "food": "即食燕麦 40g"},
+      {"slot": "蛋奶", "kind": "protein", "fists": 1, "food": "纯牛奶 250ml"},
+      {"slot": "蔬果", "kind": "veg", "fists": 1, "food": "小番茄 8 颗"}
+    ],
+    "ingredients": [
+      {"name": "即食燕麦", "amount": "40g", "hima": "主食粮油"},
+      {"name": "纯牛奶", "amount": "250ml×1", "hima": "肉蛋奶"},
+      {"name": "小番茄", "amount": "250g", "hima": "蔬菜"}
+    ],
+    "steps": ["牛奶微波 1 分钟（约 60℃）", "倒入燕麦静置 2 分钟", "小番茄洗净直接吃"],
+    "cook_tool": "none", "cook_minutes": 5,
+    "tags": ["快手", "无需烹饪"], "satiety_hint": null
+  },
+  {
+    "name": "全麦蛋三明治",
+    "meal_type": "breakfast",
+    "slots": [
+      {"slot": "粗粮", "kind": "staple", "fists": 1, "food": "全麦面包 2 片"},
+      {"slot": "蛋奶", "kind": "protein", "fists": 1, "food": "水煮蛋 1 个"},
+      {"slot": "蔬果", "kind": "veg", "fists": 1, "food": "生菜 3 片 + 番茄半个"}
+    ],
+    "ingredients": [
+      {"name": "全麦面包", "amount": "1 袋", "hima": "主食粮油"},
+      {"name": "鸡蛋", "amount": "1 个", "hima": "肉蛋奶"},
+      {"name": "生菜", "amount": "1 颗", "hima": "蔬菜"},
+      {"name": "番茄", "amount": "1 个", "hima": "蔬菜"}
+    ],
+    "steps": ["煮蛋器煮蛋 8 分钟", "同步洗净生菜、切番茄片", "面包夹蛋与蔬菜对折即食"],
+    "cook_tool": "none", "cook_minutes": 9,
+    "tags": ["快手", "煮蛋器"], "satiety_hint": null
+  },
+  {
+    "name": "微波紫薯牛奶",
+    "meal_type": "breakfast",
+    "slots": [
+      {"slot": "粗粮", "kind": "staple", "fists": 1, "food": "紫薯 150g"},
+      {"slot": "蛋奶", "kind": "protein", "fists": 1, "food": "纯牛奶 250ml"},
+      {"slot": "蔬果", "kind": "veg", "fists": 1, "food": "黄瓜半根"}
+    ],
+    "ingredients": [
+      {"name": "紫薯", "amount": "2 个", "hima": "蔬菜"},
+      {"name": "纯牛奶", "amount": "250ml×1", "hima": "肉蛋奶"},
+      {"name": "黄瓜", "amount": "1 根", "hima": "蔬菜"}
+    ],
+    "steps": ["紫薯裹湿厨房纸微波高火 4 分钟", "牛奶同步微波 1 分钟", "黄瓜洗净切条"],
+    "cook_tool": "none", "cook_minutes": 6,
+    "tags": ["快手", "微波"], "satiety_hint": null
+  },
+  {
+    "name": "甜玉米煮蛋",
+    "meal_type": "breakfast",
+    "slots": [
+      {"slot": "粗粮", "kind": "staple", "fists": 1, "food": "甜玉米半根"},
+      {"slot": "蛋奶", "kind": "protein", "fists": 1, "food": "水煮蛋 1 个"},
+      {"slot": "蔬果", "kind": "veg", "fists": 1, "food": "圣女果 8 颗"}
+    ],
+    "ingredients": [
+      {"name": "甜玉米", "amount": "1 根", "hima": "蔬菜"},
+      {"name": "鸡蛋", "amount": "1 个", "hima": "肉蛋奶"},
+      {"name": "圣女果", "amount": "250g", "hima": "蔬菜"}
+    ],
+    "steps": ["煮蛋器煮蛋 8 分钟", "玉米切段裹湿纸微波 3 分钟", "圣女果洗净"],
+    "cook_tool": "none", "cook_minutes": 8,
+    "tags": ["快手", "煮蛋器"], "satiety_hint": null
+  },
+  {
+    "name": "燕麦酸奶杯",
+    "meal_type": "breakfast",
+    "slots": [
+      {"slot": "粗粮", "kind": "staple", "fists": 1, "food": "即食燕麦 40g"},
+      {"slot": "蛋奶", "kind": "protein", "fists": 1, "food": "无糖酸奶 150g"},
+      {"slot": "蔬果", "kind": "veg", "fists": 1, "food": "黄瓜半根"}
+    ],
+    "ingredients": [
+      {"name": "即食燕麦", "amount": "40g", "hima": "主食粮油"},
+      {"name": "无糖酸奶", "amount": "150g×1", "hima": "肉蛋奶"},
+      {"name": "黄瓜", "amount": "1 根", "hima": "蔬菜"}
+    ],
+    "steps": ["酸奶倒入杯中", "铺燕麦静置 2 分钟变软", "黄瓜切条同食"],
+    "cook_tool": "none", "cook_minutes": 4,
+    "tags": ["快手", "无需烹饪"], "satiety_hint": null
+  },
+  {
+    "name": "全麦馒头牛奶",
+    "meal_type": "breakfast",
+    "slots": [
+      {"slot": "粗粮", "kind": "staple", "fists": 1, "food": "全麦馒头 1 个"},
+      {"slot": "蛋奶", "kind": "protein", "fists": 1, "food": "纯牛奶 250ml"},
+      {"slot": "蔬果", "kind": "veg", "fists": 1, "food": "小番茄 8 颗"}
+    ],
+    "ingredients": [
+      {"name": "全麦馒头", "amount": "1 袋", "hima": "主食粮油"},
+      {"name": "纯牛奶", "amount": "250ml×1", "hima": "肉蛋奶"},
+      {"name": "小番茄", "amount": "250g", "hima": "蔬菜"}
+    ],
+    "steps": ["馒头微波 40 秒回软", "牛奶微波 1 分钟", "小番茄洗净"],
+    "cook_tool": "none", "cook_minutes": 5,
+    "tags": ["快手", "微波"], "satiety_hint": null
+  },
+  {
+    "name": "微波红薯煮蛋",
+    "meal_type": "breakfast",
+    "slots": [
+      {"slot": "粗粮", "kind": "staple", "fists": 1, "food": "红薯 200g"},
+      {"slot": "蛋奶", "kind": "protein", "fists": 1, "food": "水煮蛋 1 个"},
+      {"slot": "蔬果", "kind": "veg", "fists": 1, "food": "圣女果 8 颗"}
+    ],
+    "ingredients": [
+      {"name": "红薯", "amount": "1 个", "hima": "蔬菜"},
+      {"name": "鸡蛋", "amount": "1 个", "hima": "肉蛋奶"},
+      {"name": "圣女果", "amount": "250g", "hima": "蔬菜"}
+    ],
+    "steps": ["红薯裹湿厨房纸微波高火 5 分钟", "煮蛋器煮蛋 8 分钟（同步）", "圣女果洗净"],
+    "cook_tool": "none", "cook_minutes": 9,
+    "tags": ["快手", "微波"], "satiety_hint": null
+  },
+  {
+    "name": "玉米片牛奶碗",
+    "meal_type": "breakfast",
+    "slots": [
+      {"slot": "粗粮", "kind": "staple", "fists": 1, "food": "低糖玉米片 40g"},
+      {"slot": "蛋奶", "kind": "protein", "fists": 1, "food": "纯牛奶 250ml"},
+      {"slot": "蔬果", "kind": "veg", "fists": 1, "food": "黄瓜半根"}
+    ],
+    "ingredients": [
+      {"name": "低糖玉米片", "amount": "1 袋", "hima": "主食粮油"},
+      {"name": "纯牛奶", "amount": "250ml×1", "hima": "肉蛋奶"},
+      {"name": "黄瓜", "amount": "1 根", "hima": "蔬菜"}
+    ],
+    "steps": ["玉米片入碗", "倒牛奶即食", "黄瓜切条"],
+    "cook_tool": "none", "cook_minutes": 3,
+    "tags": ["快手", "无需烹饪"], "satiety_hint": null
+  },
+  {
+    "name": "全麦吐司煮蛋",
+    "meal_type": "breakfast",
+    "slots": [
+      {"slot": "粗粮", "kind": "staple", "fists": 1, "food": "全麦吐司 2 片"},
+      {"slot": "蛋奶", "kind": "protein", "fists": 1, "food": "水煮蛋 1 个"},
+      {"slot": "蔬果", "kind": "veg", "fists": 1, "food": "生菜 3 片"}
+    ],
+    "ingredients": [
+      {"name": "全麦吐司", "amount": "1 袋", "hima": "主食粮油"},
+      {"name": "鸡蛋", "amount": "1 个", "hima": "肉蛋奶"},
+      {"name": "生菜", "amount": "1 颗", "hima": "蔬菜"}
+    ],
+    "steps": ["煮蛋器煮蛋 8 分钟", "吐司微波 20 秒", "生菜洗净垫着吃"],
+    "cook_tool": "none", "cook_minutes": 8,
+    "tags": ["快手", "煮蛋器"], "satiety_hint": null
+  },
+  {
+    "name": "紫薯酸奶杯",
+    "meal_type": "breakfast",
+    "slots": [
+      {"slot": "粗粮", "kind": "staple", "fists": 1, "food": "紫薯 150g"},
+      {"slot": "蛋奶", "kind": "protein", "fists": 1, "food": "无糖酸奶 150g"},
+      {"slot": "蔬果", "kind": "veg", "fists": 1, "food": "小番茄 8 颗"}
+    ],
+    "ingredients": [
+      {"name": "紫薯", "amount": "2 个", "hima": "蔬菜"},
+      {"name": "无糖酸奶", "amount": "150g×1", "hima": "肉蛋奶"},
+      {"name": "小番茄", "amount": "250g", "hima": "蔬菜"}
+    ],
+    "steps": ["紫薯裹湿厨房纸微波高火 4 分钟", "压泥铺杯底", "倒酸奶，小番茄同食"],
+    "cook_tool": "none", "cook_minutes": 6,
+    "tags": ["快手", "微波"], "satiety_hint": null
+  },
+  {
+    "name": "蒸玉米牛奶",
+    "meal_type": "breakfast",
+    "slots": [
+      {"slot": "粗粮", "kind": "staple", "fists": 1, "food": "甜玉米半根"},
+      {"slot": "蛋奶", "kind": "protein", "fists": 1, "food": "纯牛奶 250ml"},
+      {"slot": "蔬果", "kind": "veg", "fists": 1, "food": "黄瓜半根"}
+    ],
+    "ingredients": [
+      {"name": "甜玉米", "amount": "1 根", "hima": "蔬菜"},
+      {"name": "纯牛奶", "amount": "250ml×1", "hima": "肉蛋奶"},
+      {"name": "黄瓜", "amount": "1 根", "hima": "蔬菜"}
+    ],
+    "steps": ["玉米切段微波 3 分钟", "牛奶微波 1 分钟", "黄瓜切条"],
+    "cook_tool": "none", "cook_minutes": 5,
+    "tags": ["快手", "微波"], "satiety_hint": null
+  },
+  {
+    "name": "全麦面包牛奶套餐",
+    "meal_type": "breakfast",
+    "slots": [
+      {"slot": "粗粮", "kind": "staple", "fists": 1, "food": "全麦面包 2 片"},
+      {"slot": "蛋奶", "kind": "protein", "fists": 1, "food": "纯牛奶 250ml"},
+      {"slot": "蔬果", "kind": "veg", "fists": 1, "food": "番茄 1 个"}
+    ],
+    "ingredients": [
+      {"name": "全麦面包", "amount": "1 袋", "hima": "主食粮油"},
+      {"name": "纯牛奶", "amount": "250ml×1", "hima": "肉蛋奶"},
+      {"name": "番茄", "amount": "1 个", "hima": "蔬菜"}
+    ],
+    "steps": ["牛奶微波 1 分钟", "面包可直接吃或烤 1 分钟", "番茄洗净切块"],
+    "cook_tool": "none", "cook_minutes": 4,
+    "tags": ["快手", "无需烹饪"], "satiety_hint": null
+  },
+  {
+    "name": "彩椒鸡胸杂粮饭（便当）",
+    "meal_type": "lunch",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "彩椒+杏鲍菇共 300g"},
+      {"slot": "主食", "kind": "staple", "fists": 1, "food": "杂粮饭 150g"},
+      {"slot": "肉类", "kind": "protein", "fists": 1, "food": "鸡胸肉 150g"}
+    ],
+    "ingredients": [
+      {"name": "鸡胸肉", "amount": "150g", "hima": "肉蛋奶"},
+      {"name": "彩椒", "amount": "2 个", "hima": "蔬菜"},
+      {"name": "杏鲍菇", "amount": "1 根", "hima": "蔬菜"},
+      {"name": "杂粮米", "amount": "50g", "hima": "主食粮油"}
+    ],
+    "steps": ["鸡胸切丁腌 10 分钟，彩椒杏鲍菇切块", "Cook5 放油选「炒肉」程序投鸡丁 5 分钟", "接彩椒杏鲍菇再炒 4 分钟，杂粮饭电饭煲同步煮", "装盒冷藏，次日公司微波 3 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 20,
+    "tags": ["带饭友好", "高蛋白", "耐复热"], "satiety_hint": "八分饱"
+  },
+  {
+    "name": "西兰花牛柳杂粮饭（便当）",
+    "meal_type": "lunch",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "西兰花 300g"},
+      {"slot": "主食", "kind": "staple", "fists": 1, "food": "杂粮饭 150g"},
+      {"slot": "肉类", "kind": "protein", "fists": 1, "food": "牛柳 150g"}
+    ],
+    "ingredients": [
+      {"name": "牛柳", "amount": "150g", "hima": "肉蛋奶"},
+      {"name": "西兰花", "amount": "1 颗", "hima": "蔬菜"},
+      {"name": "杂粮米", "amount": "50g", "hima": "主食粮油"},
+      {"name": "蚝油", "amount": "1 瓶", "hima": "调味"}
+    ],
+    "steps": ["牛柳切片用生抽淀粉腌 10 分钟", "西兰花掰小朵焯水 2 分钟", "Cook5「炒肉」程序炒牛柳 5 分钟后下西兰花蚝油再 3 分钟", "装盒冷藏，次日公司微波 3 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 22,
+    "tags": ["带饭友好", "耐复热"], "satiety_hint": "八分饱"
+  },
+  {
+    "name": "杏鲍菇瘦肉糙米饭（便当）",
+    "meal_type": "lunch",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "杏鲍菇+胡萝卜共 300g"},
+      {"slot": "主食", "kind": "staple", "fists": 1, "food": "糙米饭 150g"},
+      {"slot": "肉类", "kind": "protein", "fists": 1, "food": "猪里脊 150g"}
+    ],
+    "ingredients": [
+      {"name": "猪里脊", "amount": "150g", "hima": "肉蛋奶"},
+      {"name": "杏鲍菇", "amount": "2 根", "hima": "蔬菜"},
+      {"name": "胡萝卜", "amount": "1 根", "hima": "蔬菜"},
+      {"name": "糙米", "amount": "50g", "hima": "主食粮油"}
+    ],
+    "steps": ["里脊切片腌制，菇切滚刀块、胡萝卜切片", "Cook5「小炒肉」程序 6 分钟出油", "下蔬菜同炒 5 分钟，糙米饭电饭煲同步", "装盒冷藏，次日公司微波 3 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 22,
+    "tags": ["带饭友好", "耐复热"], "satiety_hint": "八分饱"
+  },
+  {
+    "name": "清炒豆角鸡丁饭（便当）",
+    "meal_type": "lunch",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "四季豆 300g"},
+      {"slot": "主食", "kind": "staple", "fists": 1, "food": "杂粮饭 150g"},
+      {"slot": "肉类", "kind": "protein", "fists": 1, "food": "鸡胸肉 150g"}
+    ],
+    "ingredients": [
+      {"name": "鸡胸肉", "amount": "150g", "hima": "肉蛋奶"},
+      {"name": "四季豆", "amount": "300g", "hima": "蔬菜"},
+      {"name": "杂粮米", "amount": "50g", "hima": "主食粮油"},
+      {"name": "蒜末", "amount": "3 瓣", "hima": "调味"}
+    ],
+    "steps": ["四季豆掐段（必须彻底炒熟），鸡胸切丁腌制", "Cook5 放油蒜末，「干煸」程序先煸豆角 6 分钟", "下鸡丁再炒 5 分钟", "装盒冷藏，次日公司微波 3 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 20,
+    "tags": ["带饭友好", "高蛋白", "耐复热"], "satiety_hint": "八分饱"
+  },
+  {
+    "name": "番茄牛肉末杂粮饭（便当）",
+    "meal_type": "lunch",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "番茄 2 个 + 洋葱半个"},
+      {"slot": "主食", "kind": "staple", "fists": 1, "food": "杂粮饭 150g"},
+      {"slot": "肉类", "kind": "protein", "fists": 1, "food": "牛肉末 150g"}
+    ],
+    "ingredients": [
+      {"name": "牛肉末", "amount": "150g", "hima": "肉蛋奶"},
+      {"name": "番茄", "amount": "2 个", "hima": "蔬菜"},
+      {"name": "洋葱", "amount": "1 个", "hima": "蔬菜"},
+      {"name": "杂粮米", "amount": "50g", "hima": "主食粮油"}
+    ],
+    "steps": ["番茄切块、洋葱切丁", "Cook5 放油先炒牛肉末 4 分钟", "下番茄洋葱「番茄炒蛋」档炖炒 8 分钟至汁浓", "装盒冷藏，次日公司微波 3 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 22,
+    "tags": ["带饭友好", "下饭", "耐复热"], "satiety_hint": "八分饱"
+  },
+  {
+    "name": "双菇鸡片杂粮饭（便当）",
+    "meal_type": "lunch",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "香菇+口蘑共 300g"},
+      {"slot": "主食", "kind": "staple", "fists": 1, "food": "杂粮饭 150g"},
+      {"slot": "肉类", "kind": "protein", "fists": 1, "food": "鸡胸肉 150g"}
+    ],
+    "ingredients": [
+      {"name": "鸡胸肉", "amount": "150g", "hima": "肉蛋奶"},
+      {"name": "香菇", "amount": "6 朵", "hima": "蔬菜"},
+      {"name": "口蘑", "amount": "6 朵", "hima": "蔬菜"},
+      {"name": "生抽", "amount": "1 瓶", "hima": "调味"}
+    ],
+    "steps": ["鸡胸切片腌制 10 分钟，菇切片", "Cook5「炒菌菇」程序干煸双菇 4 分钟盛出", "「炒肉」程序炒鸡片 5 分钟后倒回双菇翻炒 3 分钟", "装盒冷藏，次日公司微波 3 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 20,
+    "tags": ["带饭友好", "耐复热"], "satiety_hint": "八分饱"
+  },
+  {
+    "name": "彩椒牛肉粒藜麦饭（便当）",
+    "meal_type": "lunch",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "彩椒 2 个"},
+      {"slot": "主食", "kind": "staple", "fists": 1, "food": "藜麦饭 150g"},
+      {"slot": "肉类", "kind": "protein", "fists": 1, "food": "牛柳 150g"}
+    ],
+    "ingredients": [
+      {"name": "牛柳", "amount": "150g", "hima": "肉蛋奶"},
+      {"name": "彩椒", "amount": "2 个", "hima": "蔬菜"},
+      {"name": "藜麦", "amount": "50g", "hima": "主食粮油"},
+      {"name": "黑胡椒酱", "amount": "1 瓶", "hima": "调味"}
+    ],
+    "steps": ["牛柳切粒腌 10 分钟，彩椒切块", "Cook5 放油「炒肉」程序煎炒牛肉粒 6 分钟", "下彩椒与黑胡椒酱翻炒 4 分钟，藜麦同步煮 15 分钟", "装盒冷藏，次日公司微波 3 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 22,
+    "tags": ["带饭友好", "耐复热"], "satiety_hint": "八分饱"
+  },
+  {
+    "name": "西葫芦炒蛋杂粮饭（便当）",
+    "meal_type": "lunch",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "西葫芦 300g"},
+      {"slot": "主食", "kind": "staple", "fists": 1, "food": "杂粮饭 150g"},
+      {"slot": "肉类", "kind": "protein", "fists": 1, "food": "鸡蛋 2 个"}
+    ],
+    "ingredients": [
+      {"name": "鸡蛋", "amount": "2 个", "hima": "肉蛋奶"},
+      {"name": "西葫芦", "amount": "1 根", "hima": "蔬菜"},
+      {"name": "杂粮米", "amount": "50g", "hima": "主食粮油"}
+    ],
+    "steps": ["鸡蛋打散，西葫芦切片", "Cook5 刷油炒蛋 2 分钟盛出", "下西葫芦炒 4 分钟后倒回鸡蛋加盐翻匀", "装盒冷藏，次日公司微波 3 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 18,
+    "tags": ["带饭友好", "快手"], "satiety_hint": "八分饱"
+  },
+  {
+    "name": "土豆咖喱鸡杂粮饭（便当）",
+    "meal_type": "lunch",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "土豆+胡萝卜共 300g"},
+      {"slot": "主食", "kind": "staple", "fists": 1, "food": "杂粮饭 150g"},
+      {"slot": "肉类", "kind": "protein", "fists": 1, "food": "鸡胸肉 150g"}
+    ],
+    "ingredients": [
+      {"name": "鸡胸肉", "amount": "150g", "hima": "肉蛋奶"},
+      {"name": "土豆", "amount": "1 个", "hima": "蔬菜"},
+      {"name": "胡萝卜", "amount": "1 根", "hima": "蔬菜"},
+      {"name": "咖喱粉", "amount": "1 盒", "hima": "调味"}
+    ],
+    "steps": ["土豆胡萝卜鸡肉全切块", "Cook5 放油下全部食材加半碗水，选「咖喱」炖炒 15 分钟", "收汁关火", "装盒冷藏，次日公司微波 3 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 25,
+    "tags": ["带饭友好", "下饭", "耐复热"], "satiety_hint": "八分饱"
+  },
+  {
+    "name": "荷兰豆牛柳杂粮饭（便当）",
+    "meal_type": "lunch",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "荷兰豆 300g"},
+      {"slot": "主食", "kind": "staple", "fists": 1, "food": "杂粮饭 150g"},
+      {"slot": "肉类", "kind": "protein", "fists": 1, "food": "牛柳 150g"}
+    ],
+    "ingredients": [
+      {"name": "牛柳", "amount": "150g", "hima": "肉蛋奶"},
+      {"name": "荷兰豆", "amount": "300g", "hima": "蔬菜"},
+      {"name": "杂粮米", "amount": "50g", "hima": "主食粮油"},
+      {"name": "蒜末", "amount": "3 瓣", "hima": "调味"}
+    ],
+    "steps": ["荷兰豆掐两头去筋，牛柳切片腌制", "Cook5 放油蒜末「炒肉」程序炒牛柳 5 分钟", "下荷兰豆大火翻炒 4 分钟断生", "装盒冷藏，次日公司微波 3 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 18,
+    "tags": ["带饭友好", "快手", "耐复热"], "satiety_hint": "八分饱"
+  },
+  {
+    "name": "清蒸鲈鱼套餐",
+    "meal_type": "lunch",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "空心菜 300g"},
+      {"slot": "主食", "kind": "staple", "fists": 1, "food": "杂粮饭 150g"},
+      {"slot": "肉类", "kind": "protein", "fists": 1, "food": "鲈鱼 1 条"}
+    ],
+    "ingredients": [
+      {"name": "鲈鱼", "amount": "1 条", "hima": "水产"},
+      {"name": "空心菜", "amount": "300g", "hima": "蔬菜"},
+      {"name": "杂粮米", "amount": "50g", "hima": "主食粮油"},
+      {"name": "蒸鱼豉油", "amount": "1 瓶", "hima": "调味"}
+    ],
+    "steps": ["鲈鱼两面改刀铺姜丝，Cook5 蒸篮蒸 12 分钟", "出锅淋蒸鱼豉油与热油", "Cook5 洗锅后蒜末炒空心菜 4 分钟", "杂粮饭同步电饭煲"],
+    "cook_tool": "cook5", "cook_minutes": 22,
+    "tags": ["周末现做", "高蛋白"], "satiety_hint": "八分饱"
+  },
+  {
+    "name": "香煎鸡排藜麦沙拉",
+    "meal_type": "lunch",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "生菜黄瓜番茄拼盘 300g"},
+      {"slot": "主食", "kind": "staple", "fists": 1, "food": "藜麦 50g"},
+      {"slot": "肉类", "kind": "protein", "fists": 1, "food": "鸡胸排 150g"}
+    ],
+    "ingredients": [
+      {"name": "鸡胸肉", "amount": "150g", "hima": "肉蛋奶"},
+      {"name": "生菜", "amount": "1 颗", "hima": "蔬菜"},
+      {"name": "黄瓜", "amount": "1 根", "hima": "蔬菜"},
+      {"name": "番茄", "amount": "1 个", "hima": "蔬菜"},
+      {"name": "藜麦", "amount": "50g", "hima": "主食粮油"},
+      {"name": "油醋汁", "amount": "1 瓶", "hima": "调味"}
+    ],
+    "steps": ["藜麦煮 15 分钟过凉水", "鸡胸用平底锅每面煎 4 分钟", "蔬菜洗净撕块，淋油醋汁拌匀", "鸡排切片盖在沙拉上"],
+    "cook_tool": "stove", "cook_minutes": 25,
+    "tags": ["周末现做", "轻食"], "satiety_hint": "八分饱"
+  },
+  {
+    "name": "蒜蓉基围虾 + 白灼菜心",
+    "meal_type": "dinner",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "菜心 400g"},
+      {"slot": "鱼虾贝", "kind": "seafood", "fists": 1, "food": "基围虾 300g"}
+    ],
+    "ingredients": [
+      {"name": "基围虾", "amount": "300g", "hima": "水产"},
+      {"name": "菜心", "amount": "400g", "hima": "蔬菜"},
+      {"name": "蒜末", "amount": "3 瓣", "hima": "调味"}
+    ],
+    "steps": ["虾开背去线，菜心洗净", "Cook5 锅中放油 10ml+蒜末，选择「炒虾」程序，投虾 3 分钟", "取出虾后直接注水烧开白灼菜心 2 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 25,
+    "tags": ["Cook5", "高蛋白"], "satiety_hint": "六分饱"
+  },
+  {
+    "name": "清蒸鲈鱼 + 蒜蓉西兰花",
+    "meal_type": "dinner",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "西兰花 300g"},
+      {"slot": "鱼虾贝", "kind": "seafood", "fists": 1, "food": "鲈鱼 1 条"}
+    ],
+    "ingredients": [
+      {"name": "鲈鱼", "amount": "1 条", "hima": "水产"},
+      {"name": "西兰花", "amount": "1 颗", "hima": "蔬菜"},
+      {"name": "蒸鱼豉油", "amount": "1 瓶", "hima": "调味"}
+    ],
+    "steps": ["鲈鱼改刀铺姜丝，Cook5 蒸篮蒸 12 分钟", "出锅淋蒸鱼豉油", "洗锅注水烧开，西兰花焯水 2 分钟淋蒜蓉酱油"],
+    "cook_tool": "cook5", "cook_minutes": 22,
+    "tags": ["Cook5", "清蒸"], "satiety_hint": "六分饱"
+  },
+  {
+    "name": "白灼虾 + 清炒荷兰豆",
+    "meal_type": "dinner",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "荷兰豆 300g"},
+      {"slot": "鱼虾贝", "kind": "seafood", "fists": 1, "food": "鲜虾 300g"}
+    ],
+    "ingredients": [
+      {"name": "基围虾", "amount": "300g", "hima": "水产"},
+      {"name": "荷兰豆", "amount": "300g", "hima": "蔬菜"},
+      {"name": "蒜末", "amount": "3 瓣", "hima": "调味"}
+    ],
+    "steps": ["Cook5 注水烧开加姜片，鲜虾灼 2 分钟捞出", "洗锅放油蒜末，炒荷兰豆 4 分钟", "虾蘸生抽即可"],
+    "cook_tool": "cook5", "cook_minutes": 15,
+    "tags": ["Cook5", "快手"], "satiety_hint": "六分饱"
+  },
+  {
+    "name": "香煎三文鱼 + 煎芦笋",
+    "meal_type": "dinner",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "芦笋 250g"},
+      {"slot": "鱼虾贝", "kind": "seafood", "fists": 1, "food": "三文鱼 200g"}
+    ],
+    "ingredients": [
+      {"name": "三文鱼", "amount": "200g", "hima": "水产"},
+      {"name": "芦笋", "amount": "250g", "hima": "蔬菜"},
+      {"name": "海盐黑胡椒", "amount": "1 瓶", "hima": "调味"}
+    ],
+    "steps": ["三文鱼拭干撒盐与黑胡椒", "平底锅少油每面煎 3 分钟", "同锅下芦笋煎 3 分钟"],
+    "cook_tool": "stove", "cook_minutes": 18,
+    "tags": ["快手", "好脂肪"], "satiety_hint": "六分饱"
+  },
+  {
+    "name": "辣炒蛤蜊 + 蒜蓉油麦菜",
+    "meal_type": "dinner",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "油麦菜 300g"},
+      {"slot": "鱼虾贝", "kind": "seafood", "fists": 1, "food": "蛤蜊 500g"}
+    ],
+    "ingredients": [
+      {"name": "蛤蜊", "amount": "500g", "hima": "水产"},
+      {"name": "油麦菜", "amount": "300g", "hima": "蔬菜"},
+      {"name": "豆瓣酱", "amount": "1 瓶", "hima": "调味"}
+    ],
+    "steps": ["蛤蜊提前吐沙 2 小时（买已吐沙的省时）", "Cook5 放油+豆瓣酱+姜片「爆炒」蛤蜊 6 分钟至开口", "洗锅蒜末清炒油麦菜 3 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 18,
+    "tags": ["Cook5", "下饭"], "satiety_hint": "六分饱"
+  },
+  {
+    "name": "蒜蓉粉丝蒸扇贝 + 白灼秋葵",
+    "meal_type": "dinner",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "秋葵 250g"},
+      {"slot": "鱼虾贝", "kind": "seafood", "fists": 1, "food": "扇贝 6 只"}
+    ],
+    "ingredients": [
+      {"name": "扇贝", "amount": "6 只", "hima": "水产"},
+      {"name": "秋葵", "amount": "250g", "hima": "蔬菜"},
+      {"name": "龙口粉丝", "amount": "1 把", "hima": "主食粮油"},
+      {"name": "蒜蓉酱", "amount": "1 瓶", "hima": "调味"}
+    ],
+    "steps": ["粉丝泡软垫贝壳，铺蒜蓉酱", "Cook5 蒸篮蒸扇贝 8 分钟", "洗锅烧水白灼秋葵 2 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 22,
+    "tags": ["Cook5", "宴客级"], "satiety_hint": "六分饱"
+  },
+  {
+    "name": "番茄炖鳕鱼 + 上汤娃娃菜",
+    "meal_type": "dinner",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "娃娃菜 300g + 番茄 1 个"},
+      {"slot": "鱼虾贝", "kind": "seafood", "fists": 1, "food": "鳕鱼 250g"}
+    ],
+    "ingredients": [
+      {"name": "鳕鱼", "amount": "250g", "hima": "水产"},
+      {"name": "娃娃菜", "amount": "2 颗", "hima": "蔬菜"},
+      {"name": "番茄", "amount": "1 个", "hima": "蔬菜"},
+      {"name": "番茄沙司", "amount": "1 瓶", "hima": "调味"}
+    ],
+    "steps": ["鳕鱼切块煎至两面微黄", "Cook5 下番茄块与鳕鱼加半碗水「炖鱼」程序 12 分钟", "娃娃菜放入同锅再煮 3 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 30,
+    "tags": ["Cook5", "酸甜口"], "satiety_hint": "六分饱"
+  },
+  {
+    "name": "酸汤龙利鱼 + 烫鸡毛菜",
+    "meal_type": "dinner",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "鸡毛菜 300g + 金针菇 100g"},
+      {"slot": "鱼虾贝", "kind": "seafood", "fists": 1, "food": "龙利鱼 300g"}
+    ],
+    "ingredients": [
+      {"name": "龙利鱼", "amount": "300g", "hima": "水产"},
+      {"name": "鸡毛菜", "amount": "300g", "hima": "蔬菜"},
+      {"name": "金针菇", "amount": "100g", "hima": "蔬菜"},
+      {"name": "黄灯笼椒酱", "amount": "1 瓶", "hima": "调味"}
+    ],
+    "steps": ["龙利鱼切片用料酒淀粉抓匀", "Cook5 放油下黄灯笼椒酱炒香，加水烧开下鱼片煮 5 分钟", "金针菇鸡毛菜烫入汤中 1 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 25,
+    "tags": ["Cook5", "开胃"], "satiety_hint": "六分饱"
+  },
+  {
+    "name": "黑椒煎虾 + 彩椒炒西葫芦",
+    "meal_type": "dinner",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "彩椒 1 个 + 西葫芦 1 根"},
+      {"slot": "鱼虾贝", "kind": "seafood", "fists": 1, "food": "大虾 300g"}
+    ],
+    "ingredients": [
+      {"name": "厄瓜多尔白虾", "amount": "300g", "hima": "水产"},
+      {"name": "彩椒", "amount": "1 个", "hima": "蔬菜"},
+      {"name": "西葫芦", "amount": "1 根", "hima": "蔬菜"},
+      {"name": "黑胡椒酱", "amount": "1 瓶", "hima": "调味"}
+    ],
+    "steps": ["大虾开背去线", "平底锅少油煎虾每面 2 分钟淋黑胡椒酱", "同锅下彩椒西葫芦片炒 4 分钟"],
+    "cook_tool": "stove", "cook_minutes": 20,
+    "tags": ["快手"], "satiety_hint": "六分饱"
+  },
+  {
+    "name": "椒盐虾 + 白灼芥蓝",
+    "meal_type": "dinner",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "芥蓝 300g"},
+      {"slot": "鱼虾贝", "kind": "seafood", "fists": 1, "food": "九节虾 300g"}
+    ],
+    "ingredients": [
+      {"name": "九节虾", "amount": "300g", "hima": "水产"},
+      {"name": "芥蓝", "amount": "300g", "hima": "蔬菜"},
+      {"name": "椒盐", "amount": "1 罐", "hima": "调味"}
+    ],
+    "steps": ["虾剪须开背", "Cook5 放油「爆炒」程序炒虾 5 分钟撒椒盐", "洗锅烧水白灼芥蓝 3 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 20,
+    "tags": ["Cook5"], "satiety_hint": "六分饱"
+  },
+  {
+    "name": "葱姜炒梭子蟹 + 清炒苋菜",
+    "meal_type": "dinner",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "苋菜 300g"},
+      {"slot": "鱼虾贝", "kind": "seafood", "fists": 1, "food": "梭子蟹 2 只"}
+    ],
+    "ingredients": [
+      {"name": "梭子蟹", "amount": "2 只", "hima": "水产"},
+      {"name": "苋菜", "amount": "300g", "hima": "蔬菜"},
+      {"name": "姜片", "amount": "5 片", "hima": "调味"},
+      {"name": "葱段", "amount": "2 根", "hima": "蔬菜"}
+    ],
+    "steps": ["螃蟹处理干净斩块，切口拍淀粉", "Cook5 放油姜片葱段，「爆炒」程序炒蟹 8 分钟", "洗锅蒜末炒苋菜 3 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 30,
+    "tags": ["Cook5", "时令"], "satiety_hint": "六分饱"
+  },
+  {
+    "name": "韭菜炒河虾 + 拍黄瓜",
+    "meal_type": "dinner",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "韭菜 200g + 黄瓜 1 根"},
+      {"slot": "鱼虾贝", "kind": "seafood", "fists": 1, "food": "小河虾 200g"}
+    ],
+    "ingredients": [
+      {"name": "小河虾", "amount": "200g", "hima": "水产"},
+      {"name": "韭菜", "amount": "200g", "hima": "蔬菜"},
+      {"name": "黄瓜", "amount": "1 根", "hima": "蔬菜"}
+    ],
+    "steps": ["Cook5 放油「爆炒」河虾 4 分钟", "下韭菜段再炒 2 分钟", "黄瓜拍碎加醋蒜末凉拌"],
+    "cook_tool": "cook5", "cook_minutes": 15,
+    "tags": ["Cook5", "快手", "时令"], "satiety_hint": "六分饱"
+  },
+  {
+    "name": "冬荫功虾汤 + 白灼菜心",
+    "meal_type": "dinner",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "菜心 300g + 草菇 100g"},
+      {"slot": "鱼虾贝", "kind": "seafood", "fists": 1, "food": "鲜虾 300g"}
+    ],
+    "ingredients": [
+      {"name": "基围虾", "amount": "300g", "hima": "水产"},
+      {"name": "菜心", "amount": "300g", "hima": "蔬菜"},
+      {"name": "草菇", "amount": "100g", "hima": "蔬菜"},
+      {"name": "冬荫功酱", "amount": "1 袋", "hima": "调味"}
+    ],
+    "steps": ["Cook5 注水加冬荫功酱烧开", "下草菇与虾煮 5 分钟", "菜心另锅白灼 2 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 25,
+    "tags": ["Cook5", "开胃"], "satiety_hint": "六分饱"
+  },
+  {
+    "name": "香煎银鳕鱼 + 蒜蓉菠菜",
+    "meal_type": "dinner",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "菠菜 300g"},
+      {"slot": "鱼虾贝", "kind": "seafood", "fists": 1, "food": "银鳕鱼 200g"}
+    ],
+    "ingredients": [
+      {"name": "银鳕鱼", "amount": "200g", "hima": "水产"},
+      {"name": "菠菜", "amount": "300g", "hima": "蔬菜"},
+      {"name": "海盐黑胡椒", "amount": "1 瓶", "hima": "调味"}
+    ],
+    "steps": ["银鳕鱼拭干撒盐与黑胡椒", "平底锅少油每面煎 3 分钟", "Cook5 或同锅蒜末炒菠菜 3 分钟"],
+    "cook_tool": "stove", "cook_minutes": 20,
+    "tags": ["快手", "高蛋白"], "satiety_hint": "六分饱"
+  },
+  {
+    "name": "花甲冬瓜汤 + 蒜蓉空心菜",
+    "meal_type": "dinner",
+    "slots": [
+      {"slot": "蔬菜", "kind": "veg", "fists": 2, "food": "冬瓜 300g + 空心菜 250g"},
+      {"slot": "鱼虾贝", "kind": "seafood", "fists": 1, "food": "花甲 400g"}
+    ],
+    "ingredients": [
+      {"name": "花甲", "amount": "400g", "hima": "水产"},
+      {"name": "冬瓜", "amount": "300g", "hima": "蔬菜"},
+      {"name": "空心菜", "amount": "250g", "hima": "蔬菜"},
+      {"name": "姜丝", "amount": "少许", "hima": "调味"}
+    ],
+    "steps": ["花甲吐沙洗净", "Cook5 注水下花甲与冬瓜片姜片煮 10 分钟至开口", "洗锅蒜末炒空心菜 3 分钟"],
+    "cook_tool": "cook5", "cook_minutes": 28,
+    "tags": ["Cook5", "清淡"], "satiety_hint": "六分饱"
+  }
+]

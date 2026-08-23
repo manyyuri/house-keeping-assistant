@@ -1,9 +1,15 @@
-"""meal_rules 纯函数单测（无 IO、无 LLM 依赖）。
+"""meal_rules 纯函数单测（无 IO、无 LLM 依赖）+ 种子菜谱库结构门禁。
 
 运行：.venv/bin/python -m server.test_meal_rules
 """
 
+import json
+from collections import Counter
+from pathlib import Path
+
 from server import meal_rules
+
+SEED_PATH = Path(__file__).resolve().parent.parent / "knowledge" / "recipes" / "recipes.json"
 
 
 def _slot(slot: str, kind: str, fists: int) -> dict:
@@ -98,6 +104,49 @@ def test_is_weekend() -> None:
 def test_templates_satiety() -> None:
     assert meal_rules.SATIETY == {"lunch": "八分饱", "dinner": "六分饱"}
     assert set(meal_rules.MEAL_TEMPLATES) == {"breakfast", "lunch", "dinner"}
+
+
+# ---------- 种子菜谱库结构门禁（knowledge/recipes/recipes.json）----------
+
+def _load_seed() -> list:
+    return json.loads(SEED_PATH.read_text(encoding="utf-8"))
+
+
+def test_seed_counts_and_structure() -> None:
+    """数量达标（早≥10/晚≥15/午≥12 且带饭≥10），每道菜过 validate_meal。"""
+    data = _load_seed()
+    by_type = Counter(r["meal_type"] for r in data)
+    assert by_type["breakfast"] >= 10
+    assert by_type["dinner"] >= 15
+    assert by_type["lunch"] >= 12
+    bento = [r for r in data if r["meal_type"] == "lunch" and meal_rules.BENTO_TAG in r["tags"]]
+    assert len(bento) >= 10
+    for r in data:
+        ok, problems = meal_rules.validate_meal(r["meal_type"], r["slots"])
+        assert ok, f"{r['name']}：{problems}"
+        for ing in r["ingredients"]:
+            assert ing["hima"] in meal_rules.HIMA_CATEGORIES, (r["name"], ing)
+
+
+def test_seed_hard_standards() -> None:
+    """场景硬标准：早≤10′免烹饪；晚≤40′可用 Cook5；带饭五条件全满足。"""
+    BENTO_LAST_STEP = "装盒冷藏，次日公司微波 3 分钟"
+    banned_protein = ("鱼", "虾", "蟹", "贝", "蛤", "花甲")
+    banned_veg = ("菠菜", "空心菜", "生菜", "油麦菜", "苋菜", "鸡毛菜")
+    for r in _load_seed():
+        name, mt = r["name"], r["meal_type"]
+        if mt == "breakfast":
+            assert r["cook_tool"] == "none" and r["cook_minutes"] <= 10, name
+        if mt == "dinner":
+            assert r["cook_tool"] in ("cook5", "stove") and r["cook_minutes"] <= 40, name
+        if mt == "lunch" and meal_rules.BENTO_TAG in r["tags"]:
+            assert r["cook_tool"] == "cook5" and r["cook_minutes"] <= 25, name
+            assert r["steps"][-1] == BENTO_LAST_STEP, name
+            for s in r["slots"]:
+                if s["kind"] == "protein":
+                    assert not any(w in s["food"] for w in banned_protein), (name, s["food"])
+                if s["kind"] == "veg":
+                    assert not any(w in s["food"] for w in banned_veg), (name, s["food"])
 
 
 if __name__ == "__main__":
