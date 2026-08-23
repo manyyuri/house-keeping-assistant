@@ -3,19 +3,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { App as AntApp, Button, Drawer, Grid, Layout, Popover, Space, Tabs, Typography } from 'antd';
 import {
+  BarChartOutlined,
+  CoffeeOutlined,
+  ContainerOutlined,
   DeleteOutlined,
+  MenuOutlined,
   MessageOutlined,
   PlusOutlined,
   QrcodeOutlined,
-  MenuOutlined,
-  BarChartOutlined,
-  ContainerOutlined,
   SettingOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons';
 import { Conversations } from '@ant-design/x';
 import * as api from './api';
 import ChatPage from './pages/ChatPage';
+import MealsPage from './pages/MealsPage';
 import TasksPage from './pages/TasksPage';
 import ItemsPage from './pages/ItemsPage';
 import StatsPage from './pages/StatsPage';
@@ -136,6 +138,7 @@ export default function App() {
 
   const tabs = [
     { key: 'chat', label: '对话', icon: <MessageOutlined />, children: <ChatPage onGoTasks={() => setTab('tasks')} /> },
+    { key: 'meals', label: isMobile ? '三餐' : '今日三餐', icon: <CoffeeOutlined />, children: <MealsPage /> },
     { key: 'tasks', label: isMobile ? '任务' : '任务看板', icon: <UnorderedListOutlined />, children: <TasksPage /> },
     { key: 'items', label: isMobile ? '物品' : '物品库', icon: <ContainerOutlined />, children: <ItemsPage /> },
     { key: 'stats', label: isMobile ? '成果' : '成果统计', icon: <BarChartOutlined />, children: <StatsPage /> },

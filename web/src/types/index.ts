@@ -86,6 +86,105 @@ export interface Stats {
   expired_quarantine: Item[];
 }
 
+// ---------- 三餐 ----------
+
+export type MealType = 'breakfast' | 'lunch' | 'dinner';
+export type MealMode = 'cook' | 'bento';
+export type MealStatus = 'planned' | 'eaten' | 'skipped';
+export type FoodKind = 'staple' | 'protein' | 'veg' | 'seafood';
+
+export interface RecipeSlot {
+  slot: string;
+  kind: FoodKind;
+  fists: number;
+  food: string;
+}
+
+export interface RecipeIngredient {
+  name: string;
+  amount: string;
+  hima: string;
+}
+
+export interface Recipe {
+  id: number;
+  name: string;
+  meal_type: MealType;
+  slots: RecipeSlot[];
+  ingredients: RecipeIngredient[];
+  steps: string[];
+  cook_tool: string;
+  cook_minutes: number | null;
+  tags: string[];
+  satiety_hint: string | null;
+}
+
+export interface BentoPreview {
+  name: string;
+  cook_minutes: number;
+}
+
+export interface MealPlan {
+  id: number;
+  plan_date: string;
+  meal_type: MealType;
+  recipe_id: number | null;
+  mode: MealMode;
+  status: MealStatus;
+  note: string | null;
+  recipe: Recipe | null;
+  /** 仅晚餐：明日便当摘要（顺手做区块） */
+  bento_preview?: BentoPreview | null;
+}
+
+export interface TomorrowPreview {
+  date: string;
+  breakfast: string | null;
+  lunch: string | null;
+  dinner: string | null;
+}
+
+export interface DayMeals {
+  date: string;
+  weekday: string;
+  meals: Record<MealType, MealPlan | null>;
+  tomorrow_preview: TomorrowPreview | null;
+}
+
+export interface WeekMealLite {
+  name: string;
+  mode: MealMode;
+  status: MealStatus;
+}
+
+export interface WeekDay {
+  date: string;
+  weekday: string;
+  is_today: boolean;
+  meals: Record<MealType, WeekMealLite | null>;
+}
+
+export interface GroceryItem {
+  name: string;
+  amounts: string[];
+  meals: string[];
+  ids: number[];
+  checked: boolean;
+}
+
+export interface GroceryGroup {
+  category: string;
+  items: GroceryItem[];
+}
+
+export interface GrocerySummary {
+  days: number;
+  through_date: string;
+  groups: GroceryGroup[];
+  total: number;
+  pending: number;
+}
+
 // ---------- LLM 模型设置 ----------
 
 export interface LLMEndpointView {

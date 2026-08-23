@@ -4,16 +4,22 @@ import type {
   ChatSSEEvent,
   Conversation,
   ConversationDetail,
+  DayMeals,
+  GrocerySummary,
   Item,
   KeepStatus,
   LLMEndpointPayload,
   LLMSettingsView,
   LLMTestResult,
+  MealPlan,
+  MealStatus,
+  MealType,
   Plan,
   PhotoUploadResult,
   Stats,
   Task,
   TaskType,
+  WeekDay,
 } from '../types';
 
 const BASE = '/api';
@@ -123,6 +129,32 @@ export const testLLMConnection = (scope: 'vision' | 'agent', endpoint?: LLMEndpo
     method: 'POST',
     body: JSON.stringify({ scope, endpoint }),
   });
+
+// ---------- meals（三餐）----------
+
+export const getMeals = (date?: string) =>
+  request<DayMeals>(`/meals${date ? `?date=${date}` : ''}`);
+
+export const getWeekMeals = () => request<WeekDay[]>('/meals/week');
+
+export const rerollMeal = (date: string, meal_type: MealType) =>
+  request<MealPlan>('/meals/reroll', {
+    method: 'POST',
+    body: JSON.stringify({ date, meal_type }),
+  });
+
+export const patchMealStatus = (id: number, status: MealStatus) =>
+  request<MealPlan>(`/meals/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+
+// ---------- grocery（盒马买菜清单）----------
+
+export const getGrocery = (days = 3) => request<GrocerySummary>(`/grocery?days=${days}`);
+
+export const patchGrocery = (id: number, checked: boolean) =>
+  request<{ ok: boolean }>(`/grocery/${id}`, { method: 'PATCH', body: JSON.stringify({ checked }) });
+
+export const clearBoughtGrocery = () =>
+  request<{ ok: boolean; deleted: number }>('/grocery?bought=true', { method: 'DELETE' });
 
 // ---------- SSE /api/chat ----------
 

@@ -4,6 +4,7 @@
   --ink: #26332c;
   --pine: #3e6b52;
   --leaf: #7fb77e;
+  --grain: #b98a4e;
   --mist: #e9e6de;
   --seal: #b3402a;
   --serif: 'Songti SC', 'Noto Serif SC', 'STSong', 'SimSun', serif;
@@ -465,6 +466,10 @@ body {
     animation: none;
   }
 
+  .fist-stamp-inner {
+    animation: none;
+  }
+
   .shutter-btn-inner {
     transition: none;
   }
@@ -476,5 +481,454 @@ body {
   .mode-strip-item,
   .mode-strip-item::before {
     transition: none;
+  }
+}
+
+/* ---- 三餐页（拳头餐盘 / 餐卡 / 便当 / 盒马清单）---- */
+
+.meal-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px 16px 76px;
+}
+
+.meal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.meal-title {
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.meal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 卡片 */
+
+.meal-card {
+  border-radius: 12px;
+}
+
+.meal-card-done {
+  opacity: 0.78;
+}
+
+.meal-eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: rgba(38, 51, 44, 0.55);
+  margin-bottom: 8px;
+}
+
+.meal-main {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.meal-main-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.meal-name {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+  margin-bottom: 6px;
+}
+
+.meal-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.meal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: rgba(38, 51, 44, 0.78);
+}
+
+.meal-chip::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--chip);
+}
+
+.kind-veg {
+  --chip: var(--leaf);
+}
+
+.kind-staple {
+  --chip: var(--grain);
+}
+
+.kind-protein,
+.kind-seafood {
+  --chip: var(--seal);
+}
+
+.meal-satiety {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--pine);
+}
+
+.meal-ing {
+  margin-top: 10px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.meal-bento-tag {
+  margin-top: 8px;
+  display: inline-block;
+  font-size: 12px;
+  color: var(--pine);
+  background: rgba(127, 183, 126, 0.14);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.bento-banner {
+  margin-top: 10px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--pine);
+  background: rgba(127, 183, 126, 0.08);
+  border-left: 3px solid var(--leaf);
+  border-radius: 0 8px 8px 0;
+}
+
+.meal-tip {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: rgba(38, 51, 44, 0.66);
+  border-left: 2px solid var(--mist);
+  padding-left: 8px;
+}
+
+.meal-steps .ant-collapse-header {
+  padding: 6px 0 !important;
+  font-size: 13px;
+}
+
+.meal-step-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: rgba(38, 51, 44, 0.82);
+}
+
+.meal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* 拳头餐盘 */
+
+.fist-plate {
+  position: relative;
+  flex: none;
+}
+
+.fist-seg {
+  stroke: var(--paper);
+  stroke-width: 1.5;
+}
+
+.fist-seg.kind-veg {
+  fill: var(--leaf);
+}
+
+.fist-seg.kind-staple {
+  fill: var(--grain);
+}
+
+.fist-seg.kind-protein,
+.fist-seg.kind-seafood {
+  fill: var(--seal);
+}
+
+.fist-plate-core {
+  fill: var(--paper);
+}
+
+.fist-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 1px;
+  pointer-events: none;
+}
+
+.fist-center-num {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.fist-center-unit {
+  font-size: 11px;
+  color: rgba(38, 51, 44, 0.55);
+}
+
+.fist-stamp {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.fist-stamp-inner {
+  display: grid;
+  place-items: center;
+  width: 58%;
+  aspect-ratio: 1;
+  border: 2px dashed var(--seal);
+  border-radius: 50%;
+  color: var(--seal);
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-indent: 0.1em;
+  background: rgba(250, 249, 246, 0.78);
+  transform: rotate(-8deg);
+  animation: stamp-in 0.28s ease-out;
+}
+
+@keyframes stamp-in {
+  from {
+    transform: rotate(-8deg) scale(1.5);
+    opacity: 0;
+  }
+
+  to {
+    transform: rotate(-8deg) scale(1);
+    opacity: 1;
+  }
+}
+
+/* 明日预览条 */
+
+.meal-tomorrow {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  background: rgba(233, 230, 222, 0.4);
+  border-radius: 10px;
+}
+
+.meal-tomorrow-names {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+}
+
+.meal-tomorrow-btn {
+  border: none;
+  background: none;
+  color: var(--pine);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* 周视图横滑 */
+
+.week-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 2px 12px;
+  scrollbar-width: thin;
+}
+
+.week-card {
+  flex: none;
+  width: 132px;
+  background: #fff;
+  border: 1px solid var(--mist);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.week-card-today {
+  border-color: var(--pine);
+  box-shadow: 0 0 0 1px var(--pine);
+}
+
+.week-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  color: rgba(38, 51, 44, 0.6);
+  margin-bottom: 8px;
+}
+
+.week-card-date {
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.week-meal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.week-meal-dot {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: rgba(38, 51, 44, 0.65);
+  background: var(--mist);
+}
+
+.week-meal-dot-done {
+  background: var(--seal);
+  color: var(--paper);
+}
+
+.week-meal-name {
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(38, 51, 44, 0.82);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 吸底买菜条 */
+
+.grocery-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  margin: 16px -16px -76px;
+  padding: 8px 16px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: rgba(250, 249, 246, 0.92);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--mist);
+}
+
+.grocery-bar-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 40px;
+  color: var(--ink);
+}
+
+.grocery-bar-btn .anticon-shopping-cart {
+  color: var(--pine);
+  font-size: 16px;
+}
+
+.grocery-bar-title {
+  font-weight: 600;
+}
+
+.grocery-bar-sub {
+  flex: 1;
+  text-align: left;
+  font-size: 12px;
+  color: rgba(38, 51, 44, 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 买菜抽屉 */
+
+.grocery-group {
+  padding: 4px 16px;
+}
+
+.grocery-cat {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--pine);
+  font-weight: 600;
+  margin: 12px 0 4px;
+}
+
+.grocery-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 7px 0;
+  min-height: 44px;
+}
+
+.grocery-row .ant-checkbox-wrapper {
+  margin-top: 2px;
+}
+
+.grocery-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.grocery-meals {
+  font-size: 11.5px;
+  color: rgba(38, 51, 44, 0.45);
+  margin-top: 2px;
+}
+
+.grocery-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* 触屏点目标加大 */
+@media (pointer: coarse) {
+  .meal-actions .ant-btn,
+  .grocery-row {
+    min-height: 44px;
+  }
+
+  .meal-actions .ant-btn {
+    padding-inline: 12px;
   }
 }
