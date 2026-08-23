@@ -82,6 +82,43 @@ CREATE TABLE IF NOT EXISTS tasks (
   created_at TEXT DEFAULT (datetime('now','localtime')),
   FOREIGN KEY(plan_id) REFERENCES plans(id)
 );
+
+CREATE TABLE IF NOT EXISTS recipes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  meal_type TEXT NOT NULL,          -- breakfast/lunch/dinner
+  slots TEXT NOT NULL,              -- JSON 餐位：[{slot,kind,fists,food}]
+  ingredients TEXT NOT NULL,        -- JSON 食材：[{name,amount,hima}]
+  steps TEXT,                       -- JSON 步骤（Cook5 步骤显式写「Cook5」）
+  cook_tool TEXT DEFAULT 'none',    -- cook5 | stove | none
+  cook_minutes INTEGER,
+  tags TEXT,                        -- JSON 标签：["带饭友好",…]
+  satiety_hint TEXT                 -- 八分饱/六分饱，展示用
+);
+
+CREATE TABLE IF NOT EXISTS meal_plans (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plan_date TEXT NOT NULL,          -- yyyy-mm-dd
+  meal_type TEXT NOT NULL,          -- breakfast/lunch/dinner
+  recipe_id INTEGER,
+  mode TEXT DEFAULT 'cook',         -- cook(现做) | bento(带饭，前一晚制)
+  status TEXT DEFAULT 'planned',    -- planned/eaten/skipped
+  note TEXT,
+  created_at TEXT DEFAULT (datetime('now','localtime')),
+  UNIQUE(plan_date, meal_type),
+  FOREIGN KEY(recipe_id) REFERENCES recipes(id)
+);
+
+CREATE TABLE IF NOT EXISTS grocery_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plan_date TEXT NOT NULL,
+  meal_type TEXT NOT NULL,
+  name TEXT NOT NULL,
+  amount TEXT,
+  hima_category TEXT,               -- 盒马分区：蔬菜/水产/肉蛋奶/主食粮油/调味
+  checked INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now','localtime'))
+);
 """
 
 
@@ -482,3 +519,198 @@ def count_done_tasks() -> int:
         "SELECT COUNT(*) AS n FROM tasks WHERE status = 'done'"
     ).fetchone()
     return int(row["n"])
+
+
+# ---------- recipes ----------
+
+def _recipe_row(row: sqlite3.Row) -> Dict[str, Any]:
+    d = dict(row)
+    for k in ("slots", "ingredients", "steps", "tags"):
+        d[k] = json.loads(d[k]) if d[k] else []
+    return d
+
+
+def list_recipes(meal_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    conn = get_conn()
+    if meal_type:
+        rows = conn.execute(
+            "SELECT * FROM recipes WHERE meal_type = ? ORDER BY id", (meal_type,)
+        ).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM recipes ORDER BY id").fetchall()
+    return [_recipe_row(r) for r in rows]
+
+
+def get_recipe(recipe_id: int) -> Optional[Dict[str, Any]]:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM recipes WHERE id = ?", (recipe_id,)).fetchone()
+    return _recipe_row(row) if row else None
+
+
+def seed_recipes(rows: List[Dict[str, Any]]) -> int:
+    """导入种子菜谱（调用方先确认表为空）。返回导入条数。"""
+    conn = get_conn()
+    with _lock:
+        for r in rows:
+            conn.execute(
+                "INSERT INTO recipes(name, meal_type, slots, ingredients, steps,"
+                " cook_tool, cook_minutes, tags, satiety_hint)"
+                " VALUES(?,?,?,?,?,?,?,?,?)",
+                (
+                    r["name"], r["meal_type"],
+                    json.dumps(r["slots"], ensure_ascii=False),
+                    json.dumps(r["ingredients"], ensure_ascii=False),
+                    json.dumps(r.get("steps") or [], ensure_ascii=False),
+                    r.get("cook_tool") or "none",
+                    r.get("cook_minutes"),
+                    json.dumps(r.get("tags") or [], ensure_ascii=False),
+                    r.get("satiety_hint"),
+                ),
+            )
+        conn.commit()
+    return len(rows)
+
+
+# ---------- meal_plans ----------
+
+def upsert_meal_plan(
+    plan_date: str, meal_type: str, recipe_id: Optional[int], mode: str = "cook"
+) -> Optional[Dict[str, Any]]:
+    """幂等写入：当日该餐已有计划则原样返回（不覆盖换菜/打卡结果）。"""
+    conn = get_conn()
+    with _lock:
+        conn.execute(
+            "INSERT INTO meal_plans(plan_date, meal_type, recipe_id, mode)"
+            " VALUES(?,?,?,?) ON CONFLICT(plan_date, meal_type) DO NOTHING",
+            (plan_date, meal_type, recipe_id, mode),
+        )
+        conn.commit()
+    return get_meal_plan(plan_date, meal_type)
+
+
+def get_meal_plan(plan_date: str, meal_type: str) -> Optional[Dict[str, Any]]:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM meal_plans WHERE plan_date = ? AND meal_type = ?",
+        (plan_date, meal_type),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def get_day_meals(plan_date: str) -> Dict[str, Dict[str, Any]]:
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM meal_plans WHERE plan_date = ?", (plan_date,)
+    ).fetchall()
+    return {r["meal_type"]: dict(r) for r in rows}
+
+
+def replace_meal_recipe(plan_date: str, meal_type: str, recipe_id: int) -> Optional[Dict[str, Any]]:
+    conn = get_conn()
+    with _lock:
+        conn.execute(
+            "UPDATE meal_plans SET recipe_id = ? WHERE plan_date = ? AND meal_type = ?",
+            (recipe_id, plan_date, meal_type),
+        )
+        conn.commit()
+    return get_meal_plan(plan_date, meal_type)
+
+
+def list_meal_plans(start: str, end: str) -> List[Dict[str, Any]]:
+    """日期闭区间内的计划（附菜名，供周视图）。"""
+    conn = get_conn()
+    return _rows_to_dicts(
+        conn.execute(
+            "SELECT p.*, r.name AS recipe_name, r.cook_minutes, r.cook_tool, r.tags"
+            " FROM meal_plans p LEFT JOIN recipes r ON p.recipe_id = r.id"
+            " WHERE p.plan_date >= ? AND p.plan_date <= ? ORDER BY p.plan_date, p.meal_type",
+            (start, end),
+        ).fetchall()
+    )
+
+
+def update_meal_status(meal_plan_id: int, status: str) -> Optional[Dict[str, Any]]:
+    conn = get_conn()
+    with _lock:
+        conn.execute(
+            "UPDATE meal_plans SET status = ? WHERE id = ?", (status, meal_plan_id)
+        )
+        conn.commit()
+    row = conn.execute("SELECT * FROM meal_plans WHERE id = ?", (meal_plan_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def update_meal_note(meal_plan_id: int, note: str) -> None:
+    conn = get_conn()
+    with _lock:
+        conn.execute("UPDATE meal_plans SET note = ? WHERE id = ?", (note, meal_plan_id))
+        conn.commit()
+
+
+def recent_recipe_ids(meal_type: str, end_date: str, days: int) -> List[int]:
+    """[end_date - days, end_date) 窗口内该餐用过的菜谱 id（轮换去重用）。"""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT DISTINCT recipe_id FROM meal_plans"
+        " WHERE meal_type = ? AND recipe_id IS NOT NULL"
+        " AND plan_date >= date(?, ?) AND plan_date < ?",
+        (meal_type, end_date, f"-{days} day", end_date),
+    ).fetchall()
+    return [r["recipe_id"] for r in rows]
+
+
+# ---------- grocery_items ----------
+
+def add_grocery_rows(rows: List[Dict[str, Any]]) -> int:
+    conn = get_conn()
+    with _lock:
+        for g in rows:
+            conn.execute(
+                "INSERT INTO grocery_items(plan_date, meal_type, name, amount, hima_category)"
+                " VALUES(?,?,?,?,?)",
+                (g["plan_date"], g["meal_type"], g["name"], g.get("amount"), g.get("hima")),
+            )
+        conn.commit()
+    return len(rows)
+
+
+def delete_grocery_for_meal(plan_date: str, meal_type: str) -> int:
+    conn = get_conn()
+    with _lock:
+        cur = conn.execute(
+            "DELETE FROM grocery_items WHERE plan_date = ? AND meal_type = ?",
+            (plan_date, meal_type),
+        )
+        conn.commit()
+    return cur.rowcount
+
+
+def list_grocery(start_date: str, end_date: str) -> List[Dict[str, Any]]:
+    conn = get_conn()
+    return _rows_to_dicts(
+        conn.execute(
+            "SELECT * FROM grocery_items WHERE plan_date >= ? AND plan_date <= ?"
+            " ORDER BY hima_category, name, plan_date",
+            (start_date, end_date),
+        ).fetchall()
+    )
+
+
+def toggle_grocery(item_id: int, checked: bool) -> bool:
+    conn = get_conn()
+    with _lock:
+        cur = conn.execute(
+            "UPDATE grocery_items SET checked = ? WHERE id = ?",
+            (1 if checked else 0, item_id),
+        )
+        conn.commit()
+    return cur.rowcount > 0
+
+
+def clear_checked_grocery() -> int:
+    """删除全部已勾选行（采购完成）。"""
+    conn = get_conn()
+    with _lock:
+        cur = conn.execute("DELETE FROM grocery_items WHERE checked = 1")
+        conn.commit()
+    return cur.rowcount
