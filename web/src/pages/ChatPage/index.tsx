@@ -33,6 +33,7 @@ import type {
 } from '../../types';
 import PlanCard from './PlanCard';
 import ThoughtPanel from './ThoughtPanel';
+import MarkdownBody from './MarkdownBody';
 
 const { Text } = Typography;
 
@@ -388,7 +389,7 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
         ))}
         {m.plan && <PlanCard plan={m.plan} onGoTasks={onGoTasks} />}
         {m.content ? (
-          <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+          <MarkdownBody content={m.content} finished={m.status === 'done' || m.status === 'stopped'} />
         ) : m.status === 'loading' ? (
           <Text type="secondary">
             <LoadingOutlined /> 正在整理思路…
