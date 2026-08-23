@@ -1,14 +1,15 @@
 """Needle Agent 工具定义与实现（写 SQLite，一律返回 {"ok":true,...} 供续写）。
 
-六个工具（§7.2）：
-  save_items / judge_items / create_plan / create_tasks / query_items / update_task_status
+八个工具（§7.2 + 三餐）：
+  save_items / judge_items / create_plan / create_tasks / query_items /
+  update_task_status / get_today_meals / reroll_meal
 """
 
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
-from server import db, rules
+from server import db, meals, rules
 
 logger = logging.getLogger("danshari.tools")
 
@@ -153,6 +154,40 @@ TOOL_SCHEMAS: List[Dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_today_meals",
+            "description": (
+                "查询三餐菜谱（默认今天，可传 yyyy-mm-dd）。含每餐菜名、拳头份量、"
+                "食材、Cook5 用时、便当信息；回答“今天吃什么/买菜清单”类问题。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "date": {"type": "string", "description": "日期 yyyy-mm-dd，缺省为今天"},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "reroll_meal",
+            "description": (
+                "换一餐的菜（breakfast/lunch/dinner），自动同步盒马买菜清单。"
+                "便当已在制作日（前一天）19:00 后做好时会被拒绝。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "meal_type": {"type": "string", "enum": ["breakfast", "lunch", "dinner"]},
+                    "date": {"type": "string", "description": "日期 yyyy-mm-dd，缺省为今天"},
+                },
+                "required": ["meal_type"],
+            },
+        },
+    },
 ]
 
 
@@ -291,6 +326,50 @@ def tool_update_task_status(task_id: int, status: str, ctx: ToolContext) -> Dict
     return {"ok": True, "task_id": task_id, "status": status}
 
 
+def tool_get_today_meals(date: Optional[str], ctx: ToolContext) -> Dict[str, Any]:
+    """查询三餐（无则幂等生成）；返回精简菜谱供 Agent 复述，菜单由规则引擎保证。"""
+    try:
+        day = meals.ensure_day(date)
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    out_meals = {}
+    for mt, p in day["meals"].items():
+        r = (p or {}).get("recipe") or {}
+        out_meals[mt] = {
+            "name": r.get("name"),
+            "mode": p.get("mode"),
+            "status": p.get("status"),
+            "fists": [f"{s['slot']}{s['fists']}拳" for s in r.get("slots", [])],
+            "ingredients": [f"{i['name']} {i['amount']}" for i in r.get("ingredients", [])],
+            "cook": f"{r.get('cook_tool')} {r.get('cook_minutes') or ''}分钟".strip(),
+        }
+    out = {"ok": True, "date": day["date"], "weekday": day["weekday"], "meals": out_meals}
+    dinner = day["meals"].get("dinner") or {}
+    if dinner.get("bento_preview"):
+        out["bento_preview"] = dinner["bento_preview"]
+    return out
+
+
+def tool_reroll_meal(meal_type: str, date: Optional[str], ctx: ToolContext) -> Dict[str, Any]:
+    if meal_type not in meals.MEAL_ORDER:
+        return {"ok": False, "error": "meal_type 必须为 breakfast/lunch/dinner"}
+    try:
+        plan = meals.reroll(date, meal_type)
+    except meals.BentoLocked:
+        return {"ok": False, "error": "便当昨晚已做好，无法换菜", "bento_locked": True}
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    r = plan["recipe"] or {}
+    return {
+        "ok": True,
+        "date": plan["plan_date"],
+        "meal_type": meal_type,
+        "recipe": r.get("name"),
+        "cook_minutes": r.get("cook_minutes"),
+        "note": "买菜清单已同步更新",
+    }
+
+
 def build_registry(ctx: ToolContext) -> Dict[str, Callable[..., Dict[str, Any]]]:
     """绑定 ToolContext 的工具注册表。"""
 
@@ -313,6 +392,12 @@ def build_registry(ctx: ToolContext) -> Dict[str, Callable[..., Dict[str, Any]]]
     def update_task_status(task_id: int, status: str) -> Dict[str, Any]:
         return tool_update_task_status(task_id, status, ctx)
 
+    def get_today_meals(date: Optional[str] = None) -> Dict[str, Any]:
+        return tool_get_today_meals(date, ctx)
+
+    def reroll_meal(meal_type: str, date: Optional[str] = None) -> Dict[str, Any]:
+        return tool_reroll_meal(meal_type, date, ctx)
+
     return {
         "save_items": save_items,
         "judge_items": judge_items,
@@ -320,4 +405,6 @@ def build_registry(ctx: ToolContext) -> Dict[str, Callable[..., Dict[str, Any]]]
         "create_tasks": create_tasks,
         "query_items": query_items,
         "update_task_status": update_task_status,
+        "get_today_meals": get_today_meals,
+        "reroll_meal": reroll_meal,
     }

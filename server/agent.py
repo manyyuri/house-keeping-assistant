@@ -141,4 +141,8 @@ def _summarize_tool_result(name: str, ret: Dict[str, Any]) -> str:
         return f"找到 {ret.get('total', 0)} 条相关物品"
     if name == "update_task_status":
         return f"任务 #{ret.get('task_id')} → {ret.get('status')}"
+    if name == "get_today_meals":
+        return f"已取回 {ret.get('date')} 三餐菜谱"
+    if name == "reroll_meal":
+        return f"{ret.get('meal_type')} 已换成「{ret.get('recipe')}」"
     return "完成"
