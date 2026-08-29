@@ -1,0 +1,20 @@
+# Scrum 排期和发版配置
+planning_day: Monday
+release_day: Sunday
+release_frequency: weekly
+
+# 版本管理
+default_version_bump: patch
+auto_detect_breaking: true
+
+# 文件路径
+backlog_file: backlog.md
+sprint_folder: sprints/
+archive_folder: sprints/archived/
+
+# 容量管理
+default_weekly_capacity: 5
+story_point_calibration:
+  small: 1
+  medium: 3
+  large: 5
