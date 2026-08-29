@@ -1,7 +1,7 @@
 /** Bubble 内嵌计划卡片：断舍离评分环 + 三列统计 + 任务跳转。 */
 
 import { useEffect, useState } from 'react';
-import { Button, Card, Col, Progress, Row, Statistic, Typography } from 'antd';
+import { Button, Card, Col, Image, Progress, Row, Space, Statistic, Typography } from 'antd';
 import { RightOutlined } from '@ant-design/icons';
 import * as api from '../../api';
 import type { PlanCreatedPayload, Plan } from '../../types';
@@ -75,6 +75,29 @@ export default function PlanCard({ plan: payload, onGoTasks }: { plan: PlanCreat
           {detail.summary}
         </Text>
       )}
+      {detail?.photos?.length ? (
+        <div style={{ marginTop: 10 }}>
+          <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 5 }}>
+            本计划照片 · {detail.photos.length} 张
+          </Text>
+          <Space size={6}>
+            {detail.photos.map((photo) => {
+              const relativePath = photo.path.startsWith('photos/') ? photo.path.slice('photos/'.length) : photo.path;
+              return (
+                <Image
+                  key={photo.id}
+                  src={`/api/photos/${relativePath}`}
+                  alt={`计划照片 ${photo.id}`}
+                  width={48}
+                  height={48}
+                  preview
+                  style={{ objectFit: 'cover', borderRadius: 6 }}
+                />
+              );
+            })}
+          </Space>
+        </div>
+      ) : null}
       <Button size="small" type="link" onClick={onGoTasks} style={{ padding: 0, marginTop: 6 }}>
         查看 {detail?.tasks?.length ?? payload.taskCount} 个整理任务 <RightOutlined />
       </Button>

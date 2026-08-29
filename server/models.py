@@ -100,6 +100,7 @@ class PlanOut(BaseModel):
     status: str = "active"
     created_at: Optional[str] = None
     tasks: List[Dict[str, Any]] = []
+    photos: List[Dict[str, Any]] = []
 
 
 # ---------- LLM 模型设置 ----------

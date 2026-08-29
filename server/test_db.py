@@ -46,6 +46,23 @@ def test_delete_empty_conversation() -> None:
     assert db.delete_conversation(conv["id"]) is True
 
 
+def test_plan_keeps_batch_photo_association() -> None:
+    """同一批照片生成一个计划，计划详情应返回完整照片集合。"""
+    _fresh_db()
+    conv = db.create_conversation("回归-批量照片")
+    photos = [db.create_photo(f"photos/test/{name}.jpg") for name in ("one", "two", "three")]
+    plan = db.create_plan(
+        room="客厅", summary="批量照片计划", danshari_score=80,
+        discard_count=1, donate_count=1, keep_count=1,
+        conversation_id=conv["id"], photo_ids=[p["id"] for p in photos],
+    )
+
+    detail = db.get_plan(plan["id"])
+    assert detail is not None
+    assert [p["id"] for p in detail["photos"]] == [p["id"] for p in photos]
+    assert [p["id"] for p in db.list_plans()] == [plan["id"]]
+
+
 # ---------- 三餐：meal_plans 幂等 / 轮换窗口 / grocery ----------
 
 def _seed_one_recipe() -> int:

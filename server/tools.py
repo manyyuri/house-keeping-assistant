@@ -270,6 +270,7 @@ def tool_create_plan(
         donate_count=int(donate_count),
         keep_count=int(keep_count),
         conversation_id=ctx.conversation_id,
+        photo_ids=ctx.photo_ids,
     )
     ctx.last_plan = {"plan_id": plan["id"], "danshari_score": score,
                      "task_count": len(db.list_tasks(plan_id=plan["id"]))}

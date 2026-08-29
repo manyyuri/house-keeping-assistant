@@ -61,6 +61,12 @@ export interface Task {
   created_at?: string;
 }
 
+export interface PlanPhoto {
+  id: number;
+  path: string;
+  room?: string | null;
+}
+
 export interface Plan {
   id: number;
   conversation_id?: number | null;
@@ -73,6 +79,7 @@ export interface Plan {
   status: string;
   created_at?: string;
   tasks?: Task[];
+  photos?: PlanPhoto[];
 }
 
 export interface Stats {

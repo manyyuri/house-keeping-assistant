@@ -70,6 +70,14 @@ CREATE TABLE IF NOT EXISTS plans (
   created_at TEXT DEFAULT (datetime('now','localtime'))
 );
 
+CREATE TABLE IF NOT EXISTS plan_photos (
+  plan_id INTEGER NOT NULL,
+  photo_id INTEGER NOT NULL,
+  PRIMARY KEY (plan_id, photo_id),
+  FOREIGN KEY(plan_id) REFERENCES plans(id) ON DELETE CASCADE,
+  FOREIGN KEY(photo_id) REFERENCES photos(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS tasks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   plan_id INTEGER NOT NULL,
@@ -386,6 +394,7 @@ def create_plan(
     donate_count: int,
     keep_count: int,
     conversation_id: Optional[int] = None,
+    photo_ids: Optional[List[int]] = None,
 ) -> Dict[str, Any]:
     conn = get_conn()
     with _lock:
@@ -396,8 +405,23 @@ def create_plan(
             (conversation_id, room, summary, danshari_score,
              discard_count, donate_count, keep_count),
         )
+        plan_id = cur.lastrowid
+        for photo_id in photo_ids or []:
+            conn.execute(
+                "INSERT OR IGNORE INTO plan_photos(plan_id, photo_id) VALUES(?, ?)",
+                (plan_id, photo_id),
+            )
         conn.commit()
-    return get_plan(cur.lastrowid)
+    return get_plan(plan_id)
+
+
+def _plan_photos(plan_id: int) -> List[Dict[str, Any]]:
+    conn = get_conn()
+    return _rows_to_dicts(conn.execute(
+        "SELECT p.* FROM photos p JOIN plan_photos pp ON pp.photo_id = p.id "
+        "WHERE pp.plan_id = ? ORDER BY p.id",
+        (plan_id,),
+    ).fetchall())
 
 
 def get_plan(plan_id: int) -> Optional[Dict[str, Any]]:
@@ -407,18 +431,19 @@ def get_plan(plan_id: int) -> Optional[Dict[str, Any]]:
         return None
     d = dict(row)
     d["tasks"] = list_tasks(plan_id=plan_id)
+    d["photos"] = _plan_photos(plan_id)
     return d
 
 
 def list_plans(status: Optional[str] = None) -> List[Dict[str, Any]]:
     conn = get_conn()
     if status:
-        return _rows_to_dicts(
-            conn.execute(
-                "SELECT * FROM plans WHERE status = ? ORDER BY id DESC", (status,)
-            ).fetchall()
-        )
-    return _rows_to_dicts(conn.execute("SELECT * FROM plans ORDER BY id DESC").fetchall())
+        rows = conn.execute(
+            "SELECT * FROM plans WHERE status = ? ORDER BY id DESC", (status,)
+        ).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM plans ORDER BY id DESC").fetchall()
+    return [get_plan(row["id"]) for row in rows]
 
 
 def update_plan_status(plan_id: int, status: str) -> Optional[Dict[str, Any]]:
