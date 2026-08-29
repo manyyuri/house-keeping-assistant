@@ -600,6 +600,7 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <ModeStrip value={taskMode} onChange={setTaskMode} />
               {showAttachments && (
+                <>
                 <Attachments
                   accept="image/*"
                   multiple
@@ -611,6 +612,12 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
                   }}
                   placeholder={{ icon: <PictureOutlined />, title: '添加照片（点击或拖拽）' }}
                 />
+                {fileList.length > 1 && (
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    本次整理批次 · {fileList.length} 张照片将生成 1 个计划
+                  </Text>
+                )}
+                </>
               )}
                 {uploadingCount > 0 && (
                   <Text type="secondary" style={{ fontSize: 12, marginTop: 2, display: 'block' }}>

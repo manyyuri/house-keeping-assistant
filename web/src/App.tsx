@@ -10,6 +10,7 @@ import {
   MenuOutlined,
   MessageOutlined,
   PlusOutlined,
+  ProjectOutlined,
   QrcodeOutlined,
   SettingOutlined,
   UnorderedListOutlined,
@@ -21,6 +22,7 @@ import MealsPage from './pages/MealsPage';
 import TasksPage from './pages/TasksPage';
 import ItemsPage from './pages/ItemsPage';
 import StatsPage from './pages/StatsPage';
+import PlansPage from './pages/PlansPage';
 import LLMSettingsModal from './pages/SettingsPage/LLMSettingsModal';
 import { useBusinessStore, useConversationStore } from './stores';
 
@@ -140,6 +142,7 @@ export default function App() {
     { key: 'chat', label: '对话', icon: <MessageOutlined />, children: <ChatPage onGoTasks={() => setTab('tasks')} /> },
     { key: 'meals', label: isMobile ? '三餐' : '今日三餐', icon: <CoffeeOutlined />, children: <MealsPage /> },
     { key: 'tasks', label: isMobile ? '任务' : '任务看板', icon: <UnorderedListOutlined />, children: <TasksPage /> },
+    { key: 'plans', label: isMobile ? '计划' : '整理计划', icon: <ProjectOutlined />, children: <PlansPage /> },
     { key: 'items', label: isMobile ? '物品' : '物品库', icon: <ContainerOutlined />, children: <ItemsPage /> },
     { key: 'stats', label: isMobile ? '成果' : '成果统计', icon: <BarChartOutlined />, children: <StatsPage /> },
   ];

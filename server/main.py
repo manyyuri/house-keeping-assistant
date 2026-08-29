@@ -400,6 +400,7 @@ async def _chat_stream(
     async def pipeline() -> None:
         summaries: List[str] = []
         messiness = "low"
+        messiness_rank = {"low": 0, "medium": 1, "high": 2}
 
         # ① 视觉识别
         if photos:
@@ -423,7 +424,10 @@ async def _chat_stream(
                     queue.put_nowait(sse_event("done", {"messageId": None}))
                     return
                 db.update_photo_vision(p["id"], result.room, result.vision_text)
-                messiness = result.messiness
+                # 一个批次的混乱度取所有照片中的最高等级，避免后处理的整洁照片
+                # 覆盖前面更混乱区域的信号。
+                if messiness_rank.get(result.messiness, 0) > messiness_rank.get(messiness, 0):
+                    messiness = result.messiness
                 summaries.append(result.to_summary())
                 queue.put_nowait(
                     sse_event(
