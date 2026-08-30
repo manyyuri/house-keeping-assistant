@@ -83,6 +83,9 @@ export async function fetchQrcode(): Promise<string> {
 export const listPlans = (status?: string) =>
   request<Plan[]>(`/plans${status ? `?status=${status}` : ''}`);
 
+export const createPlan = (body: { room: string; summary?: string }) =>
+  request<Plan>('/plans', { method: 'POST', body: JSON.stringify(body) });
+
 export const getPlan = (id: number) => request<Plan>(`/plans/${id}`);
 
 export const patchPlan = (id: number, status: string) =>

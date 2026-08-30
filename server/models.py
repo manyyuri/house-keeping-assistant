@@ -67,6 +67,13 @@ class Item(BaseModel):
 
 # ---------- plans / tasks ----------
 
+class PlanCreate(BaseModel):
+    """手动新建计划（不经 Agent）：无物品/照片，danshari_score 留空表示未评估。"""
+
+    room: str = Field(min_length=1, max_length=50)
+    summary: Optional[str] = None
+
+
 class PlanPatch(BaseModel):
     status: str = Field(pattern="^(active|completed|archived)$")
 

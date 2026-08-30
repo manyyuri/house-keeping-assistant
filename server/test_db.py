@@ -46,6 +46,26 @@ def test_delete_empty_conversation() -> None:
     assert db.delete_conversation(conv["id"]) is True
 
 
+def test_create_plan_manual_no_score() -> None:
+    """手动新建计划（无物品/照片）：danshari_score 存 NULL，不伪造评分。"""
+    _fresh_db()
+    plan = db.create_plan(
+        room="玄关", summary="先建个计划", danshari_score=None,
+        discard_count=0, donate_count=0, keep_count=0,
+    )
+    assert plan["danshari_score"] is None
+    assert plan["photos"] == []
+    assert plan["tasks"] == []
+    # 无评分计划不污染平均分（AVG 忽略 NULL）
+    _fresh_db()
+    p1 = db.create_plan(room="a", summary="", danshari_score=80,
+                        discard_count=0, donate_count=0, keep_count=0)
+    db.update_plan_status(p1["id"], "active")
+    db.create_plan(room="b", summary="", danshari_score=None,
+                   discard_count=0, donate_count=0, keep_count=0)
+    assert db.avg_danshari_score() == 80.0
+
+
 def test_plan_keeps_batch_photo_association() -> None:
     """同一批照片生成一个计划，计划详情应返回完整照片集合。"""
     _fresh_db()

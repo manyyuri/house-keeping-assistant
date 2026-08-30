@@ -30,6 +30,7 @@ from server.models import (
     LLMTestIn,
     MealRerollIn,
     MealStatusPatch,
+    PlanCreate,
     PlanPatch,
     TaskPatch,
 )
@@ -205,6 +206,23 @@ async def qrcode_png_get():
 @app.get("/api/plans")
 async def get_plans(status: Optional[str] = None):
     return db.list_plans(status=status)
+
+
+@app.post("/api/plans")
+async def post_plan(body: PlanCreate):
+    """手动新建计划（不经 Agent）：仅填区域即可创建，后续再关联任务/照片。
+
+    danshari_score 存 NULL（未评估），不伪造规则评分。
+    """
+    plan = db.create_plan(
+        room=body.room.strip(),
+        summary=(body.summary or "").strip(),
+        danshari_score=None,
+        discard_count=0,
+        donate_count=0,
+        keep_count=0,
+    )
+    return plan
 
 
 @app.get("/api/plans/{plan_id}")

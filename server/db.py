@@ -389,7 +389,7 @@ def expired_quarantine_items() -> List[Dict[str, Any]]:
 def create_plan(
     room: str,
     summary: str,
-    danshari_score: int,
+    danshari_score: Optional[int],
     discard_count: int,
     donate_count: int,
     keep_count: int,
