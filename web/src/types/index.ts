@@ -218,6 +218,8 @@ export interface LLMSettingsView {
   provider_options: LLMProviderPreset[];
   /** 保存时：被环境变量覆盖而未生效的字段提示 */
   notices?: string[];
+  /** 当前端点来源：models.json（opencode-luna）或 config（本地保存） */
+  config_source?: string;
 }
 
 export interface LLMEndpointPayload {

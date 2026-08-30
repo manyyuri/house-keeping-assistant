@@ -79,16 +79,18 @@ npm run dev   # 已开 server.host，局域网可访问，/api 自动代理到 :
 | SiliconFlow 硅基流动 | `https://api.siliconflow.cn/v1` | `Qwen/Qwen2.5-VL-32B-Instruct` | `Qwen/Qwen3-32B` |
 | 月之暗面 Moonshot | `https://api.moonshot.cn/v1` | `moonshot-v1-8k-vision-preview` | `kimi-k2-0905-preview` |
 | OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` | `gpt-4o-mini` |
+| OpenCode Luna | `https://opencode.ai/zen/go/v1` | `deepseek-v4-flash-vision-exp` | `deepseek-v4-flash` |
 
 > 模型名以各家文档为准；Agent 通道需支持 function calling（DeepSeek/qwen3/kimi 均支持）。
 
 ### 隐私与安全
 
 - **照片隐私**：视觉通道选云端时，照片（base64）会离开本机上传至该服务商处理；介意隐私可让视觉保持本地 Ollama、仅 Agent 走云端（混合模式）
-- **密钥安全**：api_key 只存本机 `server/data/config.json`（已 gitignore，权限 600）；所有 GET 接口只回掩码 `sk-****末4位`，启动日志同样只打掩码
-- **配置优先级**：环境变量 > `config.json`（UI 保存）> 代码默认值；被环境变量锁定的字段在 UI 中置灰且保存不生效
+- **密钥安全**：api_key 只存本机（`server/data/config.json` 已 gitignore，权限 600；或直接读取 `~/.pi/agent/models.json` 的 `opencode-luna` 提供方，不落本项目文件）；所有 GET 接口只回掩码 `sk-****末4位`，启动日志同样只打掩码
+- **配置优先级**：环境变量 > `models.json`（opencode-luna）> `config.json`（UI 保存）> 代码默认值；被环境变量锁定的字段在 UI 中置灰且保存不生效
+- **models.json 单点**：本机存在 `~/.pi/agent/models.json` 且含 `providers.opencode-luna` 时，视觉/Agent 端点自动使用其 `baseUrl`/`apiKey` 与对应模型（视觉 `deepseek-v4-flash-vision-exp`、Agent `deepseek-v4-flash`），修改即生效；UI 设置弹窗会标注来源。路径可用 `PI_MODELS_JSON` 覆盖
 
-可用环境变量：`VISION_PROVIDER/AGENT_PROVIDER`、`VISION_BASE_URL/AGENT_BASE_URL`、`VISION_MODEL/AGENT_MODEL`、`VISION_API_KEY/AGENT_API_KEY`、`OLLAMA_URL`（本地 Ollama 地址）。
+可用环境变量：`VISION_PROVIDER/AGENT_PROVIDER`、`VISION_BASE_URL/AGENT_BASE_URL`、`VISION_MODEL/AGENT_MODEL`、`VISION_API_KEY/AGENT_API_KEY`、`OLLAMA_URL`（本地 Ollama 地址）、`PI_MODELS_JSON`（pi 模型注册表路径）。
 
 ### REST 接口（供脚本/集成）
 

@@ -225,6 +225,7 @@ export default function LLMSettingsModal({ open, onClose }: { open: boolean; onC
       onCancel={onClose}
       width="min(520px, calc(100vw - 32px))"
       destroyOnHidden
+      styles={{ body: { maxHeight: '70vh', overflow: 'auto' } }}
       footer={
         <Space wrap style={{ justifyContent: 'flex-end', width: '100%' }}>
           <Button loading={testing === 'vision'} onClick={() => void runTest('vision')}>
@@ -240,6 +241,15 @@ export default function LLMSettingsModal({ open, onClose }: { open: boolean; onC
         </Space>
       }
     >
+      {view?.config_source === 'models.json' && (
+        <Alert
+          showIcon
+          type="info"
+          style={{ marginBottom: 12 }}
+          message="模型端点由 ~/.pi/agent/models.json 的 opencode-luna 提供"
+          description="密钥在此处集中管理，修改 models.json 即时生效。如需临时切换，用环境变量（如 AGENT_MODEL）覆盖。"
+        />
+      )}
       <Form form={form} layout="vertical" requiredMark={false}>
         <EndpointFields scope="vision" view={view} form={form} />
         <EndpointFields scope="agent" view={view} form={form} />

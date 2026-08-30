@@ -23,8 +23,23 @@ OLLAMA_DEFAULT_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 DEFAULT_VISION_MODEL = "qwen3-vl:8b"
 DEFAULT_AGENT_MODEL = "qwen3-vl:8b"
 
+# pi 的模型注册表（~/.pi/agent/models.json）：open code 外部 provider 密钥单点。
+# 项目读取其中 opencode-luna 提供方的 baseUrl/apiKey/模型，作为云端默认端点
+# （优先级：环境变量 > models.json > config.json > 代码默认值）。
+# 路径可用 PI_MODELS_JSON 覆盖（测试用）。
+PI_MODELS_DEFAULT = Path.home() / ".pi" / "agent" / "models.json"
+PI_OPCODE_LUNA_PROVIDER = "opencode-luna"
+PI_VISION_MODEL = "deepseek-v4-flash-vision-exp"
+PI_AGENT_MODEL = "deepseek-v4-flash"
+
 # 常用 OpenAI 兼容服务商预设（UI 下拉用；模型名仅占位建议，以各家文档为准）
 PROVIDER_PRESETS = [
+    {
+        "label": "OpenCode Luna（opencode-luna）",
+        "base_url": "https://opencode.ai/zen/go/v1",
+        "vision_model": PI_VISION_MODEL,
+        "agent_model": PI_AGENT_MODEL,
+    },
     {
         "label": "阿里云百炼 DashScope",
         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -95,15 +110,69 @@ def _read_json() -> Dict[str, Any]:
         return {}
 
 
+def _pi_models_path() -> Path:
+    """pi 模型注册表路径：环境变量 PI_MODELS_JSON 可覆盖（测试/换机用）。"""
+    return Path(os.environ.get("PI_MODELS_JSON") or PI_MODELS_DEFAULT)
+
+
+def _opencode_luna() -> Optional[Dict[str, Any]]:
+    """从 pi 模型注册表读取 opencode-luna 提供方（baseUrl/apiKey/模型）。
+
+    文件缺失/损坏/无该提供方 → None（回退 config.json 与默认值）。
+    返回：{"provider", "base_url", "api_key", "vision_model", "agent_model"}。
+    """
+    path = _pi_models_path()
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    prov = (data.get("providers") or {}).get(PI_OPCODE_LUNA_PROVIDER)
+    if not isinstance(prov, dict):
+        return None
+    base_url = str(prov.get("baseUrl") or "").strip()
+    api_key = str(prov.get("apiKey") or "").strip()
+    if not base_url or not api_key:
+        return None
+    models = prov.get("models") or []
+
+    def _pick(preferred: str, want_vision: bool) -> str:
+        for m in models:
+            if isinstance(m, dict) and m.get("id") == preferred and bool(m.get("vision")) == want_vision:
+                return str(m["id"])
+        for m in models:
+            if isinstance(m, dict) and bool(m.get("vision")) == want_vision:
+                return str(m["id"])
+        for m in models:
+            if isinstance(m, dict) and not bool(m.get("vision")):
+                return str(m["id"])
+        return ""
+
+    return {
+        "provider": PROVIDER_OPENAI,
+        "base_url": base_url,
+        "api_key": api_key,
+        "vision_model": _pick(PI_VISION_MODEL, True),
+        "agent_model": _pick(PI_AGENT_MODEL, False),
+    }
+
+
 def _load_endpoint(scope: str, default_model: str) -> Endpoint:
     raw = _read_json().get(scope)
     raw = raw if isinstance(raw, dict) else {}
     p = _SCOPE_ENV[scope]
     env = os.environ
-    provider = (env.get(f"{p}_PROVIDER") or raw.get("provider") or PROVIDER_OLLAMA).strip()
-    base_url = (env.get(f"{p}_BASE_URL") or raw.get("base_url") or "").strip()
-    api_key = (env.get(f"{p}_API_KEY") or raw.get("api_key") or "").strip()
-    model = (env.get(f"{p}_MODEL") or raw.get("model") or default_model).strip()
+    pi = _opencode_luna() or {}
+    pi_model_key = "vision_model" if scope == "vision" else "agent_model"
+    provider = (env.get(f"{p}_PROVIDER") or pi.get("provider")
+                or raw.get("provider") or PROVIDER_OLLAMA).strip()
+    base_url = (env.get(f"{p}_BASE_URL") or pi.get("base_url")
+                or raw.get("base_url") or "").strip()
+    api_key = (env.get(f"{p}_API_KEY") or pi.get("api_key")
+               or raw.get("api_key") or "").strip()
+    model = (env.get(f"{p}_MODEL") or pi.get(pi_model_key)
+             or raw.get("model") or default_model).strip()
     if provider == PROVIDER_OLLAMA and not base_url:
         base_url = OLLAMA_DEFAULT_URL
     return Endpoint(provider=provider, base_url=base_url, api_key=api_key, model=model)
@@ -230,4 +299,6 @@ def settings_view() -> Dict[str, Any]:
         "agent": scope_view(cfg.agent),
         "readonly": env_locked_fields(),
         "provider_options": PROVIDER_PRESETS,
+        # 当前端点来源：models.json（opencode-luna）或 config（本地保存）
+        "config_source": "models.json" if _opencode_luna() else "config",
     }

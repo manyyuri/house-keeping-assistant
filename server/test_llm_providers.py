@@ -122,7 +122,7 @@ class _ConfigSandbox:
     _ENV_KEYS = [
         "OLLAMA_URL", "VISION_PROVIDER", "VISION_BASE_URL", "VISION_API_KEY",
         "VISION_MODEL", "AGENT_PROVIDER", "AGENT_BASE_URL", "AGENT_API_KEY",
-        "AGENT_MODEL",
+        "AGENT_MODEL", "PI_MODELS_JSON",
     ]
 
     def __enter__(self) -> "_ConfigSandbox":
@@ -132,6 +132,8 @@ class _ConfigSandbox:
         self._saved_dir = llm_providers.DATA_DIR
         llm_providers.CONFIG_PATH = Path(self._tmp.name) / "config.json"
         llm_providers.DATA_DIR = Path(self._tmp.name)
+        # 隔离：默认不读真实 ~/.pi/agent/models.json
+        os.environ["PI_MODELS_JSON"] = str(Path(self._tmp.name) / "models.json")
         llm_providers.invalidate_cache()
         return self
 
@@ -150,9 +152,47 @@ def test_config_defaults() -> None:
         cfg = llm_providers.get_config()
         assert cfg.vision.provider == "ollama"
         assert cfg.vision.model == "qwen3-vl:8b"
-        assert cfg.agent.model == "needle"
+        assert cfg.agent.model == "qwen3-vl:8b"
         assert cfg.vision.base_url == "http://localhost:11434"
         assert cfg.vision.api_key == ""
+
+
+def test_pi_models_json_opencode_luna() -> None:
+    """models.json 的 opencode-luna 作为云端默认端点（优先级高于 config.json）。"""
+    with _ConfigSandbox():
+        # 写一个临时 pi 模型注册表
+        llm_providers._pi_models_path().parent.mkdir(parents=True, exist_ok=True)
+        llm_providers._pi_models_path().write_text(json.dumps({
+            "providers": {
+                "opencode-luna": {
+                    "baseUrl": "https://opencode.ai/zen/go/v1",
+                    "apiKey": "sk-pi-secret1234",
+                    "models": [
+                        {"id": "deepseek-v4-flash", "name": "DeepSeek V4 Flash", "reasoning": True},
+                        {"id": "deepseek-v4-flash-vision-exp", "name": "Vision", "vision": True},
+                    ],
+                }
+            }
+        }), encoding="utf-8")
+        llm_providers.invalidate_cache()
+        cfg = llm_providers.get_config()
+        assert cfg.vision.provider == "openai"
+        assert cfg.vision.model == "deepseek-v4-flash-vision-exp"
+        assert cfg.vision.base_url == "https://opencode.ai/zen/go/v1"
+        assert cfg.vision.api_key == "sk-pi-secret1234"
+        assert cfg.agent.model == "deepseek-v4-flash"
+        assert cfg.agent.api_key == "sk-pi-secret1234"
+
+        # 环境变量仍可覆盖 models.json
+        os.environ["AGENT_MODEL"] = "env-model"
+        llm_providers.invalidate_cache()
+        assert llm_providers.get_config().agent.model == "env-model"
+
+        # 掩码视图：明文 key 不出现在响应里
+        view = llm_providers.settings_view()
+        assert view["config_source"] == "models.json"
+        assert "sk-pi-secret1234" not in json.dumps(view)
+        assert view["agent"]["api_key_masked"] == "sk-****1234"
 
 
 def test_config_file_and_env_precedence() -> None:
