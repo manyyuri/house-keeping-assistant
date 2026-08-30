@@ -78,6 +78,12 @@ class PlanPatch(BaseModel):
     status: str = Field(pattern="^(active|completed|archived)$")
 
 
+class PlanPhotosIn(BaseModel):
+    """点计划加图：把已上传的照片 id 关联到计划。"""
+
+    photo_ids: List[int] = Field(min_length=1)
+
+
 class TaskPatch(BaseModel):
     status: str = Field(pattern="^(todo|doing|done|skipped)$")
 

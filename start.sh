@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Dobby 小精灵 一键启动：后端 uvicorn(:8000) + 前端 vite(:5173)
+# 三格电 一键启动：后端 uvicorn(:8000) + 前端 vite(:5173)
 # 用法：
 #   ./start.sh          # 前台运行（Ctrl+C 一起停）
 #   ./start.sh -d       # 后台运行（日志 /tmp/dobby-*.log）

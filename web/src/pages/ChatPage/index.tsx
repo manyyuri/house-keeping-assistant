@@ -34,6 +34,7 @@ import type {
 import PlanCard from './PlanCard';
 import ThoughtPanel from './ThoughtPanel';
 import MarkdownBody from './MarkdownBody';
+import BatteryHome from '../BatteryHome';
 
 const { Text } = Typography;
 
@@ -87,6 +88,32 @@ function ModeStrip({ value, onChange }: { value: TaskMode; onChange: (v: TaskMod
   );
 }
 
+/** 观察期复查横幅（不急着决定入口）：90 天前犹豫的物品到期了，请它们回来看一眼。
+ *  数据来自业务 store（启动 fetchAll + plan_created 触发 version 刷新），不额外打接口。 */
+function ReviewBanner({ onGoStats }: { onGoStats: () => void }) {
+  const stats = useBusinessStore((s) => s.stats);
+  const expired = stats?.expired_quarantine.length ?? 0;
+  const observing = stats?.active_hesitate.length ?? 0;
+  if (expired === 0) return null;
+  return (
+    <div className="review-banner" role="note" aria-label="观察期复查">
+      <div className="review-banner-title">
+        <span className="review-banner-seal">缓</span>
+        没急着决定的，到期了
+      </div>
+      <div className="review-banner-body">
+        有 <b>{expired}</b> 件物品，90 天前你没急着决定。
+        <br />
+        今天只问一句：现在的我还想用吗？
+        {observing > 0 && <span className="review-banner-sub"> · 另有 {observing} 件还在观察中</span>}
+      </div>
+      <button type="button" className="review-banner-cta" onClick={onGoStats}>
+        再看一眼
+      </button>
+    </div>
+  );
+}
+
 let msgSeq = 0;
 const nextId = () => `local-${Date.now()}-${msgSeq++}`;
 
@@ -95,7 +122,11 @@ function pathToUrl(path: string): string {
   return `/api/photos/${rel}`;
 }
 
-export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
+export default function ChatPage({ onGoTasks, onGoStats, onGoMeals }: {
+  onGoTasks: () => void;
+  onGoStats: () => void;
+  onGoMeals: () => void;
+}) {
   const { message: antdMessage } = AntApp.useApp();
   const activeId = useConversationStore((s) => s.activeId);
   const bumpVersion = useBusinessStore((s) => s.bumpVersion);
@@ -491,24 +522,13 @@ export default function ChatPage({ onGoTasks }: { onGoTasks: () => void }) {
           />
         ) : (
           <div className="chat-empty">
-            <div className="chat-empty-greeting">今天，想放下什么？</div>
-            <button
-              type="button"
-              className="shutter-btn"
-              onClick={() => cameraInputRef.current?.click()}
-              aria-label="拍照开始整理"
-            >
-              <span className="shutter-btn-inner" />
-            </button>
-            <div className="chat-empty-hint">对准衣柜或杂物堆，按下快门</div>
-            <Button type="link" size="small" onClick={() => albumInputRef.current?.click()}>
-              从相册选择
-            </Button>
-            {!isMobile && (
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                也可以把照片拖进输入框，或直接粘贴
-              </Text>
-            )}
+            <ReviewBanner onGoStats={onGoStats} />
+            <BatteryHome
+              onOpenCamera={() => cameraInputRef.current?.click()}
+              onOpenAlbum={() => albumInputRef.current?.click()}
+              onGoTasks={onGoTasks}
+              onGoMeals={onGoMeals}
+            />
           </div>
         )}
       </div>

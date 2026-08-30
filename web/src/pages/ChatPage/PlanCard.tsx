@@ -15,9 +15,9 @@ function scoreColor(score: number): string {
 }
 
 function scoreText(score: number): string {
-  if (score <= 40) return '急需断舍离';
-  if (score <= 70) return '有待整顿';
-  return '状态良好';
+  if (score <= 40) return '还能舍一些';
+  if (score <= 70) return '在动了';
+  return '状态不错';
 }
 
 export default function PlanCard({ plan: payload, onGoTasks }: { plan: PlanCreatedPayload; onGoTasks: () => void }) {

@@ -1,4 +1,4 @@
-# 断舍离家务整理 Agent
+# 三格电（断舍离家务整理 Agent · 省力）
 
 基于本地轻量模型（默认）或云端 API 的断舍离家务管理应用：iPhone 拍照上传 → 视觉模型识别物品 → Agent 结合断舍离理论（山下英子《断舍离》）生成整理计划与任务。
 
@@ -111,16 +111,27 @@ curl -X POST localhost:8000/api/settings/llm/test -H 'Content-Type: application/
 | --- | --- |
 | 知识库内置 | `knowledge/duansheli/` 8 文件随仓库；启动日志打印 system prompt 长度 |
 | 照片 → 计划 | 上传照片 + "帮我按断舍离整理" → SSE 流式返回识别、评估、计划、任务 |
-| 评分可信 | `plans.danshari_score` 始终来自 `rules.py`，Needle 无法覆盖 |
+| 评分可信 | `plans.danshari_score` 始终来自 `rules.py`，Needle 无法覆盖；评分语义是「代谢率」——
+            该舍未舍（高/中混乱却零丢弃）与未决物品也会扣分，堵住"全 keep 得满分"的幻觉 |
+| 物品稳定身份 | 同名物品同张照片内自动合并（`save_items` 归一化去重）；判定按归一化名匹配同批同类全部行，
+            并回传 matched 可追溯（`judge_items`）；计划丢/捐/留计数由后端从 items 表实时聚合，不信任 LLM 自报 |
 | 可中断 | Sender 取消按钮断开 SSE，后端检测断连终止管道 |
-| 犹豫观察期 | hesitate 自动 +90 天，到期在「成果统计」页提醒复查 |
+| 犹豫观察期 | hesitate 自动 +90 天，语义是「不急着决定」：到期在「成果统计」页温柔提醒再看一眼；对话首页空态显示「没急着决定的，到期了」横幅，一键跳去复查 |
+| 三格电首页 | 打开即问「今天还剩多少力气？」（满格/半格/没电）；电量真的改变内容供给：满格→15 分钟任务+可选菜单，半格→5 分钟任务+直接给晚餐，没电→2 分钟任务（或今天就歇着）+不指责的话；任务显式标「约 X 分钟」 |
+| 加分制表达 | 评分规则引擎保留（防幻觉），对外从「扣分制」翻成「加分制」：成果页主角是努力轨迹（这周完成 N 件最小的事，比上周多 X 件），分数降为「代谢率参考」 |
+| 反打卡 | 不设连击/绿点/打卡语汇；今天不做没关系，「不急着决定」和「今天就歇着」都是合法选项；兜底建议做了也不记账（诚实，不给云表扬） |
+| 时间轴账本 | 家的账（任务完成/计划创建）+ 身体的账（吃掉的餐）共用一条时间轴；任务 done、餐 eaten 打真实时间戳，只记诚实可追溯的事件 |
 | HEIC 兼容 | 上传自动转码：EXIF 转正 → RGB → 最长边 1024 JPEG（前端另有 1280 压缩） |
 | 捐赠清单 | 物品库勾选 → 一键导出 txt |
 | 降级 | Ollama 不可达时提示"请先启动 Ollama 并拉取模型"，视觉非 JSON 输出自动降级 |
 | 云端 API | 设置弹窗可切换视觉/Agent 至云端（OpenAI 兼容），保存即生效；key 错误/模型名错/断网均有中文错误提示 |
 | 混合模式 | 视觉本地 + Agent 云端（或反向）均可出计划；断舍离评分始终来自 rules.py |
 | 二段式识别 | 每张照片两遍扫描：①全局逐一识别 ②小物件专项补扫，新增项标「待确认」，Agent 先向用户确认再入库（knowledge/vision-enhancement）；`VISION_TWO_PASS=0` 可关 |
-| 回归测试 | `.venv/bin/python -m server.test_db`（存储层）、`.venv/bin/python -m server.test_vision`（识别纯函数）、`.venv/bin/python -m server.test_meal_rules`（三餐规则+种子库门禁） |
+| 回归测试 | `.venv/bin/python -m server.test_db`（存储层）、`.venv/bin/python -m server.test_battery`（三格电引擎：
+            档位上限硬约束/诚实记账/餐食供给）、`.venv/bin/python -m server.test_vision`（识别纯函数）、
+            `.venv/bin/python -m server.test_meal_rules`（三餐规则+种子库门禁）、
+            `.venv/bin/python -m server.test_agent`（Agent 循环：工具调用/未知工具/最大轮数/去重）、
+            `.venv/bin/python -m server.test_chat_pipeline`（SSE 全链路：mock 视觉+Agent，验证事件流与落库） |
 | 今日三餐 | 打开「今日三餐」页自动生成今天+明天菜单（拳头法则规则引擎，离线可用）；晚餐后顺手做明日便当（bento 锁：制作日 19:00 后禁换）；换菜自动同步盒马五分区买菜清单；对话可问“今天吃什么”、说“换个晚餐” |
 
 ## 开发调试
@@ -155,8 +166,9 @@ curl -N -G "localhost:8000/api/chat" \
 ├── scripts/               # 联调工具
 │   └── mock_openai_server.py  # mock 云端 API（vision 固定 JSON + agent 剧本 tool_calls）
 ├── server/                # FastAPI 后端
-│   ├── main.py            # REST + /api/chat SSE 管道 + 模型设置三端点
-│   ├── db.py              # SQLite 建表 + DAO（物品/计划/任务/菜谱/餐计划/买菜清单）
+│   ├── main.py            # REST + /api/chat SSE 管道 + 模型设置三端点 + /api/home + /api/timeline
+│   ├── db.py              # SQLite 建表 + DAO（物品/计划/任务/菜谱/餐计划/买菜清单/时间轴账本）
+│   ├── battery.py         # 三格电引擎：按当天精力供给最小行动+餐食+努力轨迹（省力概念核心）
 │   ├── meals.py           # 三餐推荐引擎（幂等生成/换菜/清单聚合，LLM 仅小贴士可降级）
 │   ├── llm_providers.py   # LLM 运行时配置（ENV > config.json > 默认）+ 掩码/锁定
 │   ├── ollama_client.py   # 模型访问路由层（对外签名不变）
@@ -170,7 +182,7 @@ curl -N -G "localhost:8000/api/chat" \
 │   ├── meal_rules.py      # 拳头法则硬规则（餐模板/份量校验/轮换去重/带饭筛选）
 │   └── data/              # 运行时生成：app.db + photos/ + config.json（已 gitignore）
 └── web/                   # React 18 + antd 6 + @ant-design/x v2
-    └── src/pages/         # ChatPage（对话）/ MealsPage（今日三餐）/ TasksPage / ItemsPage / StatsPage / SettingsPage（模型设置弹窗）
+    └── src/pages/         # BatteryHome（三格电首页）/ ChatPage（对话）/ MealsPage（今日三餐）/ TasksPage / ItemsPage / StatsPage（含时间轴账本）/ SettingsPage（模型设置弹窗）
 ```
 
 ## 断舍离方法论速览（内置规则来源）

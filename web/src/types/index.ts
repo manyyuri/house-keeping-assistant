@@ -93,6 +93,68 @@ export interface Stats {
   expired_quarantine: Item[];
 }
 
+// ---------- 三格电首页（省力概念核心）----------
+
+export type EnergyLevel = 'full' | 'half' | 'empty';
+
+export interface HomeTask {
+  source: 'task' | 'suggestion';
+  id?: number | null;
+  plan_id?: number | null;
+  room?: string | null;
+  type: string;
+  title: string;
+  est_minutes: number;
+  steps: string[];
+}
+
+export interface HomeMealItem {
+  type: MealType;
+  name: string;
+  cook_minutes: number | null;
+}
+
+export interface HomeMeal {
+  give: boolean;
+  meal?: HomeMealItem | null;
+  meals: HomeMealItem[];
+  text: string;
+}
+
+export interface HomeTrajectory {
+  this_week: number;
+  last_week: number;
+  delta: number;
+  line: string;
+}
+
+export interface HomePayload {
+  energy: EnergyLevel;
+  level: { key: EnergyLevel; max_min: number; label: string; title: string };
+  task: HomeTask;
+  rest_allowed: boolean;
+  meal: HomeMeal;
+  encouragement: string;
+  trajectory: HomeTrajectory;
+}
+
+// ---------- 时间轴账本（家的账 + 身体的账）----------
+
+export type TimelineKind = 'home' | 'body';
+export type TimelineIcon = 'task' | 'meal' | 'plan';
+
+export interface TimelineEvent {
+  ts: string;
+  kind: TimelineKind;
+  icon: TimelineIcon;
+  text: string;
+}
+
+export interface TimelinePayload {
+  trajectory: HomeTrajectory;
+  events: TimelineEvent[];
+}
+
 // ---------- 三餐 ----------
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner';

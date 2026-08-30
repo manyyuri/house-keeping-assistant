@@ -40,7 +40,7 @@ export default function ItemsPage() {
       await api.patchItem(item.id, { keep_status });
       await fetchItems();
       if (keep_status === 'hesitate') {
-        message.info('已进入 90 天观察期（心的保质期）');
+        message.info('先不急着决定，90 天后再看一眼');
       }
     } catch (e) {
       message.error(`改判失败：${e instanceof Error ? e.message : e}`);

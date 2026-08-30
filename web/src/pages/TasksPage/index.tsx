@@ -62,7 +62,7 @@ export default function TasksPage() {
       dataIndex: 'est_minutes',
       key: 'est_minutes',
       width: 90,
-      render: (v: number | null) => (v ? `${v} 分钟` : '-'),
+      render: (v: number | null) => (v ? `约 ${v} 分钟` : '-'),
     },
     { title: '建议日期', dataIndex: 'due_date', key: 'due_date', width: 100, render: (v) => v ?? '-' },
     {

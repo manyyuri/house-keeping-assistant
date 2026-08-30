@@ -97,7 +97,7 @@ export default function MealsPage() {
     const next = plan.status === 'eaten' ? 'planned' : 'eaten';
     try {
       await setStatus(plan, next);
-      if (next === 'eaten') message.success('打卡，拳头法则又稳了一天');
+      if (next === 'eaten') message.success('吃上了，不用操心的一餐 ✨');
     } catch (e) {
       message.error(e instanceof Error ? e.message : '操作失败');
     }

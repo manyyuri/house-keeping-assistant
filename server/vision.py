@@ -11,7 +11,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
-from server import ollama_client
+from server import ollama_client, rules
 
 logger = logging.getLogger("danshari.vision")
 
@@ -134,18 +134,12 @@ def parse_vision_output(raw: str) -> VisionResult:
     )
 
 
-def _norm_name(name: str) -> str:
-    """名称归一化：去空白/数量后缀/颜色修饰不动，供去重匹配。"""
-    s = re.sub(r"[（(]\s*\d+\s*个?[）)]$", "", name.strip())
-    return s.lower().replace(" ", "")
-
-
 def merge_second_pass(base: List[Dict[str, Any]], extra: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """合并二遍结果：extra 中与 base 同名/包含关系的视为重复丢弃，其余为新增（待确认）。"""
-    known = {_norm_name(it["name"]) for it in base}
+    known = {rules.normalize_name(it["name"]) for it in base}
     added: List[Dict[str, Any]] = []
     for it in extra:
-        n = _norm_name(it["name"])
+        n = rules.normalize_name(it["name"])
         # 双向包含："黑色上衣" vs "上衣"、"白色发夹" vs "黑色发夹"不匹配，"发夹" vs "发夹(3个)"匹配
         if any(n == k or (len(n) >= 2 and len(k) >= 2 and (n in k or k in n)) for k in known):
             continue

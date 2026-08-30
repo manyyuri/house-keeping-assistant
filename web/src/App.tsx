@@ -139,7 +139,7 @@ export default function App() {
   }, []);
 
   const tabs = [
-    { key: 'chat', label: '对话', icon: <MessageOutlined />, children: <ChatPage onGoTasks={() => setTab('tasks')} /> },
+    { key: 'chat', label: '对话', icon: <MessageOutlined />, children: <ChatPage onGoTasks={() => setTab('tasks')} onGoStats={() => setTab('stats')} onGoMeals={() => setTab('meals')} /> },
     { key: 'meals', label: isMobile ? '三餐' : '今日三餐', icon: <CoffeeOutlined />, children: <MealsPage /> },
     { key: 'tasks', label: isMobile ? '任务' : '任务看板', icon: <UnorderedListOutlined />, children: <TasksPage /> },
     { key: 'plans', label: isMobile ? '计划' : '整理计划', icon: <ProjectOutlined />, children: <PlansPage /> },
@@ -165,8 +165,8 @@ export default function App() {
           >
             <Button type="text" icon={<MenuOutlined />} onClick={() => setDrawerOpen(true)} aria-label="对话列表" />
             <span className="brand">
-              <i className="brand-seal">多</i>
-              Dobby 小精灵
+              <i className="brand-seal">电</i>
+              三格电
             </span>
             <span style={{ flex: 1 }} />
             <Button
@@ -199,8 +199,8 @@ export default function App() {
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '14px 16px 0' }}>
               <span className="brand">
-                <i className="brand-seal">多</i>
-                Dobby 小精灵
+                <i className="brand-seal">电</i>
+                三格电
               </span>
             </div>
             <div style={{ flex: 1, minHeight: 0 }}>

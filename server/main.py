@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps
 from pillow_heif import register_heif_opener
 
-from server import agent, db, llm_providers, meals, rules, vision
+from server import agent, battery, db, llm_providers, meals, rules, vision
 from server.models import (
     ConversationCreate,
     GroceryCheckPatch,
@@ -32,6 +32,7 @@ from server.models import (
     MealStatusPatch,
     PlanCreate,
     PlanPatch,
+    PlanPhotosIn,
     TaskPatch,
 )
 from server.llm_providers import Endpoint, LLMUnavailable
@@ -241,6 +242,20 @@ async def patch_plan(plan_id: int, body: PlanPatch):
     return plan
 
 
+@app.post("/api/plans/{plan_id}/photos")
+async def post_plan_photos(plan_id: int, body: PlanPhotosIn):
+    """把已上传的照片关联到计划（点计划→加图，不经 Agent）。
+
+    上传仍走 POST /api/upload（HEIC 转码等），这里只做关联。
+    不存在的 photo_id 静默忽略，返回实际新增关联数。
+    """
+    if not db.get_plan(plan_id):
+        raise HTTPException(404, "计划不存在")
+    valid = [pid for pid in body.photo_ids if db.get_photo(pid)]
+    added = db.add_plan_photos(plan_id, valid)
+    return {"ok": True, "added": added, "plan": db.get_plan(plan_id)}
+
+
 # ---------- tasks ----------
 
 @app.get("/api/tasks")
@@ -291,6 +306,27 @@ async def patch_item(item_id: int, body: ItemPatch):
     if not item:
         raise HTTPException(404, "物品不存在")
     return item
+
+
+# ---------- battery（三格电首页 / 时间轴账本，CONCEPT §6.1 / §10 M1·M2）----------
+
+
+@app.get("/api/home")
+async def get_home(energy: str = "half"):
+    """三格电首页：按当天电量供给最小行动 + 餐食 + 努力轨迹。
+
+    energy=full|half|empty，电量必须真的改变内容供给（不是 UI 装饰）。
+    """
+    if energy not in battery.ENERGY_LEVELS:
+        raise HTTPException(422, "energy 必须为 full/half/empty")
+    return battery.home_payload(energy)
+
+
+@app.get("/api/timeline")
+async def get_timeline(limit: int = 50):
+    """时间轴账本：家的账 + 身体的账一条轴（任务完成/餐吃掉/计划创建）。"""
+    limit = max(1, min(limit, 200))
+    return {"trajectory": battery.trajectory(), "events": db.timeline_events(limit=limit)}
 
 
 # ---------- stats ----------

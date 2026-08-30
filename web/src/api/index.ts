@@ -5,7 +5,9 @@ import type {
   Conversation,
   ConversationDetail,
   DayMeals,
+  EnergyLevel,
   GrocerySummary,
+  HomePayload,
   Item,
   KeepStatus,
   LLMEndpointPayload,
@@ -19,6 +21,7 @@ import type {
   Stats,
   Task,
   TaskType,
+  TimelinePayload,
   WeekDay,
 } from '../types';
 
@@ -91,6 +94,12 @@ export const getPlan = (id: number) => request<Plan>(`/plans/${id}`);
 export const patchPlan = (id: number, status: string) =>
   request<Plan>(`/plans/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
 
+export const attachPlanPhotos = (id: number, photoIds: number[]) =>
+  request<{ ok: boolean; added: number; plan: Plan }>(`/plans/${id}/photos`, {
+    method: 'POST',
+    body: JSON.stringify({ photo_ids: photoIds }),
+  });
+
 export const listTasks = (params: { status?: string; type?: TaskType | string; plan_id?: number } = {}) => {
   const qs = new URLSearchParams();
   if (params.status) qs.set('status', params.status);
@@ -116,6 +125,12 @@ export const patchItem = (id: number, body: { keep_status?: KeepStatus; last_use
   request<Item>(`/items/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 
 export const getStats = () => request<Stats>('/stats');
+
+// ---------- 三格电首页 / 时间轴账本（省力）----------
+
+export const getHome = (energy: EnergyLevel) => request<HomePayload>(`/home?energy=${energy}`);
+
+export const getTimeline = () => request<TimelinePayload>('/timeline');
 
 // ---------- LLM 模型设置 ----------
 

@@ -82,7 +82,7 @@ TOOL_SCHEMAS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "create_plan",
-            "description": "创建整理计划。danshari_score 由系统按规则计算，勿自行编造。",
+            "description": "创建整理计划。danshari_score 与丢/捐/留计数都由系统按规则与物品库实时计算，勿自行编造。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -203,7 +203,10 @@ class ToolContext:
 
 
 def tool_save_items(photo_id: int, items: List[Dict[str, Any]], ctx: ToolContext) -> Dict[str, Any]:
-    """批量入 items 表（unjudged）。photo_id 无效时挂 None（仍可入库）。"""
+    """批量入 items 表（unjudged）。photo_id 无效时挂 None（仍可入库）。
+
+    同名物品在同一张照片内自动合并（稳定身份，见 db.save_items）。
+    """
     cleaned = [
         {
             "name": str(it.get("name") or "未命名物品"),
@@ -216,33 +219,51 @@ def tool_save_items(photo_id: int, items: List[Dict[str, Any]], ctx: ToolContext
     if not cleaned:
         return {"ok": False, "error": "items 为空"}
     pid = photo_id if (photo_id and db.get_photo(photo_id)) else None
-    saved = db.save_items(pid, cleaned)
+    res = db.save_items(pid, cleaned)
     if pid and pid not in ctx.photo_ids:
         ctx.photo_ids.append(pid)
-    return {"ok": True, "saved": saved, "count": len(cleaned)}
+    return {"ok": True, "saved": res["saved"], "deduped": res["deduped"], "count": len(cleaned)}
 
 
 def tool_judge_items(judgements: List[Dict[str, Any]], ctx: ToolContext) -> Dict[str, Any]:
-    """按 name 模糊匹配更新 keep_status/reason；hesitate 自动 +90 天观察期。"""
+    """按 name 判定 keep_status/reason；hesitate 自动 +90 天观察期。
+
+    稳定身份：先按归一化名精确匹配（"冬季外套"判到"冬季外套(3件)"），
+    同批同类统一判定；无精确匹配才退回 LIKE 候选，且无批次上下文时保守只改首条，
+    绝不静默改到与名字无关的行。返回 matched（改到哪几行，可追溯）。
+    """
     updated = 0
     unmatched: List[str] = []
+    matched: List[Dict[str, Any]] = []
     for j in judgements:
         name = str(j.get("name") or "").strip()
         status = j.get("keep_status")
         if not name or status not in VALID_KEEP_STATUS:
             continue
+        norm = rules.normalize_name(name)
         candidates = db.query_items(keyword=name)
         if ctx.photo_ids:
             # 优先本轮照片关联的物品
             own = [c for c in candidates if c["photo_id"] in ctx.photo_ids]
             candidates = own or candidates
-        if not candidates:
+        exact = [c for c in candidates if rules.normalize_name(c["name"]) == norm]
+        if exact:
+            pool = exact
+        elif ctx.photo_ids:
+            pool = candidates  # 批次内：同类统一判定
+        else:
+            pool = candidates[:1]  # 无批次上下文：保守只改首条，避免误伤历史
+        if not pool:
             unmatched.append(name)
             continue
         quarantine = rules.quarantine_until_today() if status == "hesitate" else None
-        db.update_item(candidates[0]["id"], keep_status=status, reason=j.get("reason"), quarantine_until=quarantine)
-        updated += 1
-    return {"ok": True, "updated": updated, "unmatched": unmatched}
+        for c in pool:
+            db.update_item(
+                c["id"], keep_status=status, reason=j.get("reason"), quarantine_until=quarantine
+            )
+            matched.append({"id": c["id"], "name": c["name"]})
+            updated += 1
+    return {"ok": True, "updated": updated, "unmatched": unmatched, "matched": matched}
 
 
 def tool_create_plan(
@@ -253,7 +274,11 @@ def tool_create_plan(
     keep_count: int = 0,
     ctx: ToolContext = None,
 ) -> Dict[str, Any]:
-    """创建计划。danshari_score 一律由 rules.py 计算——不信任 Needle 自报分数。"""
+    """创建计划。danshari_score 一律由 rules.py 计算——不信任 Needle 自报分数。
+
+    计数（丢/捐/留）同样由 items 表实时聚合——不信任 Needle 自报计数（与评分同哲学）：
+    一个计划只讲一套可信的数字，避免 LLM 编的 counts 与规则算的 score 同屏打架。
+    """
     ctx = ctx or ToolContext()
     items: List[Dict[str, Any]] = []
     for pid in ctx.photo_ids:
@@ -262,20 +287,25 @@ def tool_create_plan(
         # 无照片关联时退化为全库未判定+已判定物品（查询类对话）
         items = db.query_items()
     score = rules.danshari_score(items, messiness=ctx.messiness)
+    counts = {"discard": 0, "donate": 0, "keep": 0}
+    for it in items:
+        st = it.get("keep_status")
+        if st in counts:
+            counts[st] += int(it.get("quantity") or 1)
     plan = db.create_plan(
         room=room,
         summary=summary,
         danshari_score=score,
-        discard_count=int(discard_count),
-        donate_count=int(donate_count),
-        keep_count=int(keep_count),
+        discard_count=counts["discard"],
+        donate_count=counts["donate"],
+        keep_count=counts["keep"],
         conversation_id=ctx.conversation_id,
         photo_ids=ctx.photo_ids,
     )
     ctx.last_plan = {"plan_id": plan["id"], "danshari_score": score,
                      "task_count": len(db.list_tasks(plan_id=plan["id"]))}
     return {"ok": True, "plan_id": plan["id"], "danshari_score": score,
-            "grade": rules.score_grade(score)}
+            "grade": rules.score_grade(score), **counts}
 
 
 def tool_create_tasks(plan_id: int, tasks: List[Dict[str, Any]], ctx: ToolContext) -> Dict[str, Any]:

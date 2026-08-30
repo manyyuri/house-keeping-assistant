@@ -83,6 +83,17 @@ def test_plan_keeps_batch_photo_association() -> None:
     assert [p["id"] for p in db.list_plans()] == [plan["id"]]
 
 
+def test_add_plan_photos_attaches_and_dedupes() -> None:
+    """点计划加图：INSERT OR IGNORE 去重，重复关联不重复计数，详情返回完整集合。"""
+    _fresh_db()
+    plan = db.create_plan(room="衣柜", summary="", danshari_score=80,
+                          discard_count=0, donate_count=0, keep_count=0)
+    p1, p2, p3 = (db.create_photo(f"photos/t/{i}.jpg")["id"] for i in range(3))
+    assert db.add_plan_photos(plan["id"], [p1, p2]) == 2
+    assert db.add_plan_photos(plan["id"], [p2, p3]) == 1  # p2 已关联，去重
+    assert {ph["id"] for ph in db.get_plan(plan["id"])["photos"]} == {p1, p2, p3}
+
+
 # ---------- 三餐：meal_plans 幂等 / 轮换窗口 / grocery ----------
 
 def _seed_one_recipe() -> int:
@@ -136,6 +147,78 @@ def test_grocery_rows_lifecycle() -> None:
     assert db.delete_grocery_for_meal("2026-08-25", "dinner") == 1  # reroll 删旧（晚餐基围虾）
     assert db.clear_checked_grocery() == 1                            # 已勾选的早餐牛奶被清
     assert db.list_grocery("2026-08-25", "2026-08-26") == []
+
+
+# ---------- 时间轴账本：done_at / eaten_at / 区间计数 / timeline ----------
+
+def _plan_with_task() -> int:
+    plan = db.create_plan(room="时间轴", summary="", danshari_score=80,
+                          discard_count=0, donate_count=0, keep_count=0)
+    ids = db.create_tasks(plan["id"], [
+        {"type": "organize", "title": "叠 T 恤", "steps": ["叠"], "est_minutes": 3}
+    ])
+    return ids[0]
+
+
+def test_task_done_sets_done_at_once() -> None:
+    """任务首次置 done 打 done_at；反复置 done 不覆盖；回退 done 后时间戳仍留痕。"""
+    _fresh_db()
+    tid = _plan_with_task()
+    assert db.get_task(tid)["done_at"] is None
+    db.update_task_status(tid, "done")
+    t1 = db.get_task(tid)["done_at"]
+    assert t1 is not None
+    db.update_task_status(tid, "todo")
+    db.update_task_status(tid, "done")
+    assert db.get_task(tid)["done_at"] == t1  # 不覆盖首次完成时刻
+
+
+def test_meal_eaten_sets_eaten_at() -> None:
+    """餐首次置 eaten 打 eaten_at。"""
+    _fresh_db()
+    rid = _seed_one_recipe()
+    plan = db.upsert_meal_plan("2026-08-24", "dinner", rid)
+    assert db.get_meal_plan("2026-08-24", "dinner")["eaten_at"] is None
+    db.update_meal_status(plan["id"], "eaten")
+    assert db.get_meal_plan("2026-08-24", "dinner")["eaten_at"] is not None
+
+
+def test_week_interval_counts() -> None:
+    """半开区间 [start, end) 计数：done/eaten 落在区间内才计入。"""
+    _fresh_db()
+    rid = _seed_one_recipe()
+    tid = _plan_with_task()
+    db.update_task_status(tid, "done")
+    plan = db.upsert_meal_plan("2026-08-24", "dinner", rid)
+    db.update_meal_status(plan["id"], "eaten")
+    # 今天一定落在 [今天-7, 明天) 内
+    from datetime import date, timedelta
+    today = date.today()
+    start = (today - timedelta(days=7)).isoformat()
+    end = (today + timedelta(days=1)).isoformat()
+    assert db.count_done_tasks_between(start, end) == 1
+    assert db.count_eaten_meals_between(start, end) == 1
+    assert db.count_done_tasks_between("2000-01-01", "2000-01-02") == 0
+
+
+def test_timeline_events_merges_home_and_body() -> None:
+    """家的账（任务 done + 计划创建）+ 身体的账（餐 eaten）合成一条时间轴。"""
+    _fresh_db()
+    rid = _seed_one_recipe()
+    tid = _plan_with_task()
+    db.update_task_status(tid, "done")
+    plan = db.upsert_meal_plan("2026-08-24", "dinner", rid)
+    db.update_meal_status(plan["id"], "eaten")
+
+    events = db.timeline_events(limit=50)
+    kinds = {e["kind"] for e in events}
+    icons = {e["icon"] for e in events}
+    assert "home" in kinds and "body" in kinds
+    assert "task" in icons and "meal" in icons and "plan" in icons
+    assert any("叠 T 恤" in e["text"] for e in events)
+    assert any("测试菜" in e["text"] for e in events)
+    ts = [e["ts"] for e in events]
+    assert ts == sorted(ts, reverse=True)  # 时间倒序
 
 
 if __name__ == "__main__":

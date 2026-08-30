@@ -10,6 +10,8 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
+from server import rules  # normalize_name：物品稳定身份匹配（无环：rules 惰性 import db）
+
 DATA_DIR = Path(__file__).resolve().parent / "data"
 PHOTOS_DIR_NAME = "photos"  # DATA_DIR 下的照片根目录，DB 存相对路径 photos/...
 DB_PATH = DATA_DIR / "app.db"
@@ -87,6 +89,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   est_minutes INTEGER,
   due_date TEXT,
   status TEXT DEFAULT 'todo',
+  done_at TEXT,                      -- 完成时刻（时间轴账本用，诚实记账）
   created_at TEXT DEFAULT (datetime('now','localtime')),
   FOREIGN KEY(plan_id) REFERENCES plans(id)
 );
@@ -111,6 +114,7 @@ CREATE TABLE IF NOT EXISTS meal_plans (
   recipe_id INTEGER,
   mode TEXT DEFAULT 'cook',         -- cook(现做) | bento(带饭，前一晚制)
   status TEXT DEFAULT 'planned',    -- planned/eaten/skipped
+  eaten_at TEXT,                    -- 吃掉的时刻（时间轴账本用，诚实记账）
   note TEXT,
   created_at TEXT DEFAULT (datetime('now','localtime')),
   UNIQUE(plan_date, meal_type),
@@ -130,6 +134,13 @@ CREATE TABLE IF NOT EXISTS grocery_items (
 """
 
 
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
+    """老库迁移：表缺列则 ALTER TABLE ADD COLUMN（CREATE TABLE IF NOT EXISTS 不会补列）。"""
+    cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
+
+
 def get_conn() -> sqlite3.Connection:
     global _conn
     if _conn is None:
@@ -139,6 +150,9 @@ def get_conn() -> sqlite3.Connection:
         conn.execute("PRAGMA foreign_keys = ON")
         with _lock:
             conn.executescript(SCHEMA)
+            # 老库迁移：时间轴账本列（tasks.done_at / meal_plans.eaten_at）
+            _ensure_column(conn, "tasks", "done_at", "done_at TEXT")
+            _ensure_column(conn, "meal_plans", "eaten_at", "eaten_at TEXT")
             conn.commit()
         _conn = conn
     return _conn
@@ -272,23 +286,43 @@ def get_photos(photo_ids: List[int]) -> List[Dict[str, Any]]:
 
 def save_items(
     photo_id: Optional[int], items: List[Dict[str, Any]]
-) -> int:
-    """批量入库，keep_status 默认 unjudged。返回入库件数（按 quantity 合计）。"""
+) -> Dict[str, int]:
+    """批量入库，keep_status 默认 unjudged。
+
+    稳定身份：同一张照片内按归一化名去重合并（同名累加 quantity，不重复插行），
+    避免同一件物品被反复拍照/重复识别堆成多行，稀释统计与观察期可信度。
+
+    返回 {"saved": 请求总件数(按 quantity 合计), "deduped": 被合并件数}。
+    """
     conn = get_conn()
+    existing: Dict[str, List[int]] = {}  # norm -> [id, quantity]
     with _lock:
+        if photo_id is not None:
+            for r in conn.execute(
+                "SELECT id, name, quantity FROM items WHERE photo_id = ?", (photo_id,)
+            ).fetchall():
+                existing[rules.normalize_name(r["name"])] = [r["id"], r["quantity"]]
+        total = 0
+        deduped = 0
         for it in items:
-            conn.execute(
-                "INSERT INTO items(photo_id, name, category, quantity, keep_status)"
-                " VALUES(?,?,?,?, 'unjudged')",
-                (
-                    photo_id,
-                    it.get("name", "未命名物品"),
-                    it.get("category") or "other",
-                    int(it.get("quantity") or 1),
-                ),
-            )
+            name = str(it.get("name") or "未命名物品")
+            qty = max(1, int(it.get("quantity") or 1))
+            total += qty
+            norm = rules.normalize_name(name)
+            if norm in existing:
+                eid, eq = existing[norm]
+                conn.execute("UPDATE items SET quantity = ? WHERE id = ?", (eq + qty, eid))
+                existing[norm][1] = eq + qty
+                deduped += qty
+            else:
+                cur = conn.execute(
+                    "INSERT INTO items(photo_id, name, category, quantity, keep_status)"
+                    " VALUES(?,?,?,?, 'unjudged')",
+                    (photo_id, name, it.get("category") or "other", qty),
+                )
+                existing[norm] = [cur.lastrowid, qty]
         conn.commit()
-    return sum(int(it.get("quantity") or 1) for it in items)
+    return {"saved": total, "deduped": deduped}
 
 
 def query_items(
@@ -415,6 +449,24 @@ def create_plan(
     return get_plan(plan_id)
 
 
+def add_plan_photos(plan_id: int, photo_ids: List[int]) -> int:
+    """把照片关联到已有计划（INSERT OR IGNORE 去重）。返回新增关联数。
+
+    供「点计划→加图」接口：上传走 /api/upload，关联走这里。
+    """
+    conn = get_conn()
+    added = 0
+    with _lock:
+        for photo_id in photo_ids:
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO plan_photos(plan_id, photo_id) VALUES(?, ?)",
+                (plan_id, photo_id),
+            )
+            added += cur.rowcount
+        conn.commit()
+    return added
+
+
 def _plan_photos(plan_id: int) -> List[Dict[str, Any]]:
     conn = get_conn()
     return _rows_to_dicts(conn.execute(
@@ -531,9 +583,20 @@ def get_task(task_id: int) -> Optional[Dict[str, Any]]:
 
 
 def update_task_status(task_id: int, status: str) -> Optional[Dict[str, Any]]:
+    """任务状态流转；首次置 done 时打 done_at（时间轴账本，诚实记账）。"""
     conn = get_conn()
     with _lock:
-        conn.execute("UPDATE tasks SET status = ? WHERE id = ?", (status, task_id))
+        cur = conn.execute("SELECT status FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        if cur is None:
+            conn.commit()
+            return None
+        if cur["status"] != "done" and status == "done":
+            conn.execute(
+                "UPDATE tasks SET status = ?, done_at = datetime('now','localtime') WHERE id = ?",
+                (status, task_id),
+            )
+        else:
+            conn.execute("UPDATE tasks SET status = ? WHERE id = ?", (status, task_id))
         conn.commit()
     return get_task(task_id)
 
@@ -542,6 +605,17 @@ def count_done_tasks() -> int:
     conn = get_conn()
     row = conn.execute(
         "SELECT COUNT(*) AS n FROM tasks WHERE status = 'done'"
+    ).fetchone()
+    return int(row["n"])
+
+
+def count_done_tasks_between(start: str, end: str) -> int:
+    """[start, end) 半开区间内完成的任务数（done_at 落在区间）。"""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM tasks WHERE done_at IS NOT NULL"
+        " AND date(done_at) >= ? AND date(done_at) < ?",
+        (start, end),
     ).fetchone()
     return int(row["n"])
 
@@ -655,14 +729,72 @@ def list_meal_plans(start: str, end: str) -> List[Dict[str, Any]]:
 
 
 def update_meal_status(meal_plan_id: int, status: str) -> Optional[Dict[str, Any]]:
+    """餐状态流转；首次置 eaten 时打 eaten_at（时间轴账本，诚实记账）。"""
     conn = get_conn()
     with _lock:
-        conn.execute(
-            "UPDATE meal_plans SET status = ? WHERE id = ?", (status, meal_plan_id)
-        )
+        cur = conn.execute(
+            "SELECT status FROM meal_plans WHERE id = ?", (meal_plan_id,)
+        ).fetchone()
+        if cur is None:
+            conn.commit()
+            return None
+        if cur["status"] != "eaten" and status == "eaten":
+            conn.execute(
+                "UPDATE meal_plans SET status = ?, eaten_at = datetime('now','localtime')"
+                " WHERE id = ?",
+                (status, meal_plan_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE meal_plans SET status = ? WHERE id = ?", (status, meal_plan_id)
+            )
         conn.commit()
     row = conn.execute("SELECT * FROM meal_plans WHERE id = ?", (meal_plan_id,)).fetchone()
     return dict(row) if row else None
+
+
+def count_eaten_meals_between(start: str, end: str) -> int:
+    """[start, end) 半开区间内吃掉的餐数（eaten_at 落在区间）。"""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM meal_plans WHERE eaten_at IS NOT NULL"
+        " AND date(eaten_at) >= ? AND date(eaten_at) < ?",
+        (start, end),
+    ).fetchone()
+    return int(row["n"])
+
+
+def timeline_events(limit: int = 50) -> List[Dict[str, Any]]:
+    """时间轴账本：家的账（任务完成/计划创建）+ 身体的账（吃掉的餐）合成一条轴。
+
+    只收录诚实可追溯的事件：任务 done_at、餐 eaten_at、计划 created_at 都有时间戳，
+    按时间倒序返回。物品判定的时间戳暂未记录，不伪造进账本。
+    """
+    conn = get_conn()
+    events: List[Dict[str, Any]] = []
+    meal_label = {"breakfast": "早餐", "lunch": "午餐", "dinner": "晚餐"}
+    for r in conn.execute(
+        "SELECT title, done_at AS ts FROM tasks WHERE done_at IS NOT NULL"
+        " ORDER BY done_at DESC LIMIT ?",
+        (limit,),
+    ).fetchall():
+        events.append({"ts": r["ts"], "kind": "home", "icon": "task", "text": f"完成「{r['title']}」"})
+    for r in conn.execute(
+        "SELECT p.meal_type, p.eaten_at AS ts, r.name AS recipe FROM meal_plans p"
+        " LEFT JOIN recipes r ON p.recipe_id = r.id WHERE p.eaten_at IS NOT NULL"
+        " ORDER BY p.eaten_at DESC LIMIT ?",
+        (limit,),
+    ).fetchall():
+        label = meal_label.get(r["meal_type"], r["meal_type"])
+        name = r["recipe"] or "一餐"
+        events.append({"ts": r["ts"], "kind": "body", "icon": "meal", "text": f"吃了{label}「{name}」"})
+    for r in conn.execute(
+        "SELECT room, created_at AS ts FROM plans ORDER BY created_at DESC LIMIT ?",
+        (limit,),
+    ).fetchall():
+        events.append({"ts": r["ts"], "kind": "home", "icon": "plan", "text": f"整理了「{r['room']}」"})
+    events.sort(key=lambda e: e["ts"] or "", reverse=True)
+    return events[:limit]
 
 
 def update_meal_note(meal_plan_id: int, note: str) -> None:

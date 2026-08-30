@@ -128,13 +128,20 @@ def _summarize_tool_result(name: str, ret: Dict[str, Any]) -> str:
     if not ret.get("ok"):
         return f"失败：{ret.get('error', '未知错误')}"
     if name == "save_items":
-        return f"已入库 {ret.get('saved', 0)} 件物品"
+        saved = ret.get("saved", 0)
+        deduped = ret.get("deduped")
+        if deduped:
+            return f"已入库 {saved} 件物品（同名合并 {deduped} 件）"
+        return f"已入库 {saved} 件物品"
     if name == "judge_items":
         unmatched = ret.get("unmatched") or []
         extra = f"（{len(unmatched)} 件未匹配）" if unmatched else ""
         return f"已判定 {ret.get('updated', 0)} 件{extra}"
     if name == "create_plan":
-        return f"计划 #{ret.get('plan_id')} 已创建，断舍离评分 {ret.get('danshari_score')}"
+        return (
+            f"计划 #{ret.get('plan_id')} 已创建，断舍离评分 {ret.get('danshari_score')}"
+            f"（丢 {ret.get('discard_count', 0)} / 捐 {ret.get('donate_count', 0)} / 留 {ret.get('keep_count', 0)}）"
+        )
     if name == "create_tasks":
         return f"已创建 {ret.get('count', 0)} 个任务"
     if name == "query_items":
