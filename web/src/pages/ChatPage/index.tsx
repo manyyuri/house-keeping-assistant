@@ -147,6 +147,8 @@ export default function ChatPage({ onGoTasks, onGoStats, onGoMeals }: {
   const abortRef = useRef<AbortController | null>(null);
   // 发送防重入：一次点击/回车只发一条（双击、回车与点击竞态时直接忽略）
   const sendingRef = useRef(false);
+  // 照片上传完成自动发起整理：每批照片自动出 1 个计划（拍照→免手动点发送）
+  const autoSentRef = useRef(false);
   // Wake Lock：生成期间保持屏幕常亮，避免 iOS 锁屏掐断 SSE
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -222,6 +224,7 @@ export default function ChatPage({ onGoTasks, onGoStats, onGoMeals }: {
         return;
       }
       setFlashKey((k) => k + 1); // 快门闪光：照片进入的一瞬
+      autoSentRef.current = false; // 新一批照片：允许再次自动发起整理
       for (const f of files.slice(0, remain)) {
         const uid = `up-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         fileMapRef.current.set(uid, f);
@@ -431,6 +434,25 @@ export default function ChatPage({ onGoTasks, onGoStats, onGoMeals }: {
     abortRef.current?.abort();
     if (waitTokenRef.current) waitTokenRef.current.cancelled = true;
   }, []);
+
+  // ---------- 照片上传完成 → 自动生成整理计划 ----------
+  // 拍照/选图后免去手动点发送：本批照片全部上传落地即自动发起
+  // （空文字时按当前任务模式补提示词，默认即「请根据照片帮我按断舍离的方法整理」）。
+  // 触发条件：有已完成照片 && 无进行中上传 && 未在生成 && 未输入文字（输入了走手动发送）。
+  // 带 1.2s 短延迟：连拍/连选同一房间多张时合并为 1 个计划；中途有变化则取消计时。
+  useEffect(() => {
+    const allDone = fileList.length > 0 && fileList.every((f) => f.status === 'done');
+    if (!allDone || generating || awaitingPhotos || sendingRef.current || autoSentRef.current) return;
+    if (inputValue.trim()) return; // 用户已输入文字：交给手动发送，避免吞掉输入
+    const t = window.setTimeout(() => {
+      if (!sendingRef.current && !autoSentRef.current) {
+        autoSentRef.current = true;
+        void send('');
+      }
+    }, 1200);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileList, generating, awaitingPhotos, inputValue, send]);
 
   // ---------- 渲染 ----------
 
