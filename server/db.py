@@ -506,6 +506,58 @@ def update_plan_status(plan_id: int, status: str) -> Optional[Dict[str, Any]]:
     return get_plan(plan_id)
 
 
+def update_plan_content(
+    plan_id: int,
+    room: str,
+    summary: str,
+    danshari_score: Optional[int],
+    discard_count: int,
+    donate_count: int,
+    keep_count: int,
+) -> Optional[Dict[str, Any]]:
+    """覆写计划内容（重新生成用）：区域/总结/评分/计数就地更新，不新建。
+
+    保留 conversation 归属与计划状态；照片关联不动（输入照片已在 plan_photos 中）。
+    """
+    conn = get_conn()
+    with _lock:
+        conn.execute(
+            "UPDATE plans SET room = ?, summary = ?, danshari_score = ?,"
+            " discard_count = ?, donate_count = ?, keep_count = ? WHERE id = ?",
+            (room, summary, danshari_score, discard_count, donate_count, keep_count, plan_id),
+        )
+        conn.commit()
+    return get_plan(plan_id)
+
+
+def delete_plan_photo_items(plan_id: int) -> None:
+    """删除计划关联照片下的物品（重新生成前清场）。
+
+    否则同一张照片再次识别 → save_items 按归一化名累加 quantity，数量会被翻倍。
+    """
+    conn = get_conn()
+    with _lock:
+        conn.execute(
+            "DELETE FROM items WHERE photo_id IN"
+            " (SELECT photo_id FROM plan_photos WHERE plan_id = ?)",
+            (plan_id,),
+        )
+        conn.commit()
+
+
+def delete_plan_pending_tasks(plan_id: int) -> None:
+    """删除计划未完成任务（重新生成前清场）。
+
+    仅删 done_at IS NULL 的行：已完成任务进过时间轴账本（诚实记账），必须保留。
+    """
+    conn = get_conn()
+    with _lock:
+        conn.execute(
+            "DELETE FROM tasks WHERE plan_id = ? AND done_at IS NULL", (plan_id,)
+        )
+        conn.commit()
+
+
 def avg_danshari_score() -> Optional[float]:
     """活跃/已完成计划的平均断舍离评分。"""
     conn = get_conn()

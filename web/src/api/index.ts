@@ -193,6 +193,26 @@ export async function streamChat(opts: StreamChatOptions): Promise<void> {
   if (opts.photoIds?.length) qs.set('photo_ids', opts.photoIds.join(','));
 
   const resp = await fetch(`${BASE}/chat?${qs.toString()}`, { signal: opts.signal });
+  await consumeSSE(resp, opts.onEvent);
+}
+
+/** POST /api/plans/{id}/generate SSE：手动触发生成/重新生成计划。 */
+export interface StreamPlanGenerateOptions {
+  planId: number;
+  signal?: AbortSignal;
+  onEvent: (ev: ChatSSEEvent) => void;
+}
+
+export async function streamPlanGenerate(opts: StreamPlanGenerateOptions): Promise<void> {
+  const resp = await fetch(`${BASE}/plans/${opts.planId}/generate`, {
+    method: 'POST',
+    signal: opts.signal,
+  });
+  await consumeSSE(resp, opts.onEvent);
+}
+
+/** 共用 SSE 消费：校验响应 + 按空行分块解析 event:/data: 行。 */
+async function consumeSSE(resp: Response, onEvent: (ev: ChatSSEEvent) => void): Promise<void> {
   if (!resp.ok || !resp.body) {
     let detail = `${resp.status}`;
     try {
@@ -216,7 +236,7 @@ export async function streamChat(opts: StreamChatOptions): Promise<void> {
     }
     if (!dataLines.length) return;
     try {
-      opts.onEvent({ event, data: JSON.parse(dataLines.join('\n')) } as ChatSSEEvent);
+      onEvent({ event, data: JSON.parse(dataLines.join('\n')) } as ChatSSEEvent);
     } catch {
       /* 非 JSON data 忽略 */
     }

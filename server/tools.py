@@ -198,6 +198,9 @@ class ToolContext:
     conversation_id: Optional[int] = None
     photo_ids: List[int] = field(default_factory=list)
     messiness: str = "low"
+    # 重新生成模式：非 None 时 create_plan 覆写该既有计划（而非新建），
+    # 工具 schema 对 LLM 不变——由上下文决定建/改，天然向后兼容
+    target_plan_id: Optional[int] = None
     # create_plan 执行后回填，供 SSE 层推送 plan_created 事件
     last_plan: Optional[Dict[str, Any]] = None
 
@@ -218,7 +221,14 @@ def tool_save_items(photo_id: int, items: List[Dict[str, Any]], ctx: ToolContext
     ]
     if not cleaned:
         return {"ok": False, "error": "items 为空"}
-    pid = photo_id if (photo_id and db.get_photo(photo_id)) else None
+    # 模型常把 photo_id 猜错：校验失败时兜底挂到本轮首个照片，
+    # 避免散落到 photo_id=None 而污染「全库兜底」的评分与统计。
+    if photo_id and db.get_photo(photo_id):
+        pid = photo_id
+    elif ctx.photo_ids:
+        pid = ctx.photo_ids[0]
+    else:
+        pid = None
     res = db.save_items(pid, cleaned)
     if pid and pid not in ctx.photo_ids:
         ctx.photo_ids.append(pid)
@@ -283,8 +293,9 @@ def tool_create_plan(
     items: List[Dict[str, Any]] = []
     for pid in ctx.photo_ids:
         items.extend(db.query_items(photo_id=pid))
-    if not items:
+    if not items and ctx.target_plan_id is None:
         # 无照片关联时退化为全库未判定+已判定物品（查询类对话）
+        # 重新生成模式禁用：plan 的照片域空 ≠ 全库，避免历史物品污染本次评分
         items = db.query_items()
     score = rules.danshari_score(items, messiness=ctx.messiness)
     counts = {"discard": 0, "donate": 0, "keep": 0}
@@ -292,19 +303,28 @@ def tool_create_plan(
         st = it.get("keep_status")
         if st in counts:
             counts[st] += int(it.get("quantity") or 1)
-    plan = db.create_plan(
-        room=room,
-        summary=summary,
-        danshari_score=score,
-        discard_count=counts["discard"],
-        donate_count=counts["donate"],
-        keep_count=counts["keep"],
-        conversation_id=ctx.conversation_id,
-        photo_ids=ctx.photo_ids,
-    )
-    ctx.last_plan = {"plan_id": plan["id"], "danshari_score": score,
-                     "task_count": len(db.list_tasks(plan_id=plan["id"]))}
-    return {"ok": True, "plan_id": plan["id"], "danshari_score": score,
+    if ctx.target_plan_id is not None:
+        # 重新生成：覆写既有计划（保留 conversation 归属与已完成任务账本，照片关联不动）
+        plan = db.update_plan_content(
+            ctx.target_plan_id, room, summary, score,
+            counts["discard"], counts["donate"], counts["keep"],
+        )
+        plan_id = ctx.target_plan_id
+    else:
+        plan = db.create_plan(
+            room=room,
+            summary=summary,
+            danshari_score=score,
+            discard_count=counts["discard"],
+            donate_count=counts["donate"],
+            keep_count=counts["keep"],
+            conversation_id=ctx.conversation_id,
+            photo_ids=ctx.photo_ids,
+        )
+        plan_id = plan["id"]
+    ctx.last_plan = {"plan_id": plan_id, "danshari_score": score,
+                     "task_count": len(db.list_tasks(plan_id=plan_id))}
+    return {"ok": True, "plan_id": plan_id, "danshari_score": score,
             "grade": rules.score_grade(score), **counts}
 
 

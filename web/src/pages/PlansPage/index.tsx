@@ -1,6 +1,6 @@
 /** 整理计划中心：新建计划 + 点计划补照片 + 按批次回看照片、计划结论与任务完成度。 */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   App as AntApp,
   Button,
@@ -16,7 +16,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import { PlusOutlined, UploadOutlined } from '@ant-design/icons';
+import { PlusOutlined, ThunderboltOutlined, UploadOutlined } from '@ant-design/icons';
 import * as api from '../../api';
 import { useBusinessStore } from '../../stores';
 import type { Plan } from '../../types';
@@ -28,15 +28,21 @@ function photoUrl(path: string): string {
   return `/api/photos/${relative}`;
 }
 
-/** 计划详情弹窗：查看照片/结论/任务进度，并直接上传照片挂到该计划。 */
+/** 计划详情弹窗：查看照片/结论/任务进度，上传照片挂到该计划，并手动触发生成。 */
 function PlanDetailModal({
   plan,
+  genId,
   onClose,
   onUploaded,
+  onGenerate,
+  onStopGenerate,
 }: {
   plan: Plan;
+  genId: number | null;
   onClose: () => void;
   onUploaded: (updated: Plan) => void;
+  onGenerate: (plan: Plan) => void;
+  onStopGenerate: () => void;
 }) {
   const { message } = AntApp.useApp();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -135,6 +141,28 @@ function PlanDetailModal({
       </div>
 
       <div style={{ marginTop: 16 }}>
+        <Button
+          type="primary"
+          icon={<ThunderboltOutlined />}
+          disabled={!photos.length}
+          loading={genId === plan.id}
+          onClick={() => onGenerate(plan)}
+        >
+          {photos.length ? (genId === plan.id ? '生成中…' : '生成整理计划') : '先上传照片'}
+        </Button>
+        {genId === plan.id && (
+          <Button size="small" style={{ marginLeft: 8 }} onClick={onStopGenerate}>
+            停止
+          </Button>
+        )}
+        <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 6 }}>
+          {photos.length
+            ? '按照片重新识别物品并生成/更新计划（保留已完成任务与账本）'
+            : '需要至少一张照片才能生成'}
+        </Text>
+      </div>
+
+      <div style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
           <Text type="secondary">任务进度</Text>
           <Text type="secondary">
@@ -152,7 +180,12 @@ function PlanDetailModal({
   );
 }
 
-function PlanEntry({ plan, onClick }: { plan: Plan; onClick: (p: Plan) => void }) {
+function PlanEntry({ plan, genId, onClick, onGenerate }: {
+  plan: Plan;
+  genId: number | null;
+  onClick: (p: Plan) => void;
+  onGenerate: (plan: Plan) => void;
+}) {
   const tasks = plan.tasks ?? [];
   const done = tasks.filter((task) => task.status === 'done').length;
   const percent = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
@@ -168,9 +201,24 @@ function PlanEntry({ plan, onClick }: { plan: Plan; onClick: (p: Plan) => void }
             {plan.created_at ?? '未记录时间'} · {plan.photos?.length ?? 0} 张照片
           </Text>
         </div>
-        <Tag color={plan.status === 'completed' ? 'green' : 'blue'}>
-          {plan.status === 'completed' ? '已完成' : '进行中'}
-        </Tag>
+        <Space>
+          <Tag color={plan.status === 'completed' ? 'green' : 'blue'}>
+            {plan.status === 'completed' ? '已完成' : '进行中'}
+          </Tag>
+          <Button
+            size="small"
+            type="link"
+            icon={<ThunderboltOutlined />}
+            disabled={!plan.photos?.length}
+            loading={genId === plan.id}
+            onClick={(e) => {
+              e.stopPropagation();
+              onGenerate(plan);
+            }}
+          >
+            {plan.photos?.length ? '生成' : '无照片'}
+          </Button>
+        </Space>
       </div>
 
       {plan.photos?.length ? (
@@ -215,6 +263,49 @@ export default function PlansPage() {
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<Plan | null>(null);
+  // 正在生成/重新生成的计划 id（一次只生成一个）
+  const [genId, setGenId] = useState<number | null>(null);
+  const genAbortRef = useRef<AbortController | null>(null);
+
+  const generatePlan = useCallback(
+    async (plan: Plan) => {
+      if (genId !== null) return;
+      if (!plan.photos?.length) {
+        message.warning('该计划还没有照片，先上传照片再触发生成');
+        return;
+      }
+      setGenId(plan.id);
+      const controller = new AbortController();
+      genAbortRef.current = controller;
+      try {
+        await api.streamPlanGenerate({
+          planId: plan.id,
+          signal: controller.signal,
+          onEvent: (ev) => {
+            if (ev.event === 'plan_created') {
+              message.success(
+                `「${plan.room}」已生成：评分 ${ev.data.danshariScore} · ${ev.data.taskCount} 个任务`,
+              );
+            } else if (ev.event === 'error') {
+              message.error(ev.data.message);
+            }
+          },
+        });
+        bumpVersion(); // 刷新列表
+        const fresh = await api.getPlan(plan.id);
+        setSelected((s) => (s && s.id === plan.id ? fresh : s)); // 弹窗同步刷新
+      } catch (e) {
+        if (controller.signal.aborted) message.info('已停止生成');
+        else message.error(`生成失败：${e instanceof Error ? e.message : e}`);
+      } finally {
+        setGenId(null);
+        genAbortRef.current = null;
+      }
+    },
+    [genId, message, bumpVersion],
+  );
+
+  const stopGenerate = useCallback(() => genAbortRef.current?.abort(), []);
 
   useEffect(() => {
     void fetchPlans();
@@ -262,7 +353,12 @@ export default function PlansPage() {
         locale={{ emptyText: <Empty description="还没有整理计划，先建一个或拍一组照片吧" /> }}
         renderItem={(plan) => (
           <List.Item style={{ paddingInline: 0 }}>
-            <PlanEntry plan={plan} onClick={(p) => setSelected(p)} />
+            <PlanEntry
+              plan={plan}
+              genId={genId}
+              onClick={(p) => setSelected(p)}
+              onGenerate={generatePlan}
+            />
           </List.Item>
         )}
       />
@@ -287,11 +383,14 @@ export default function PlansPage() {
       {selected && (
         <PlanDetailModal
           plan={selected}
+          genId={genId}
           onClose={() => setSelected(null)}
           onUploaded={(updated) => {
             setSelected(updated);
             bumpVersion();
           }}
+          onGenerate={generatePlan}
+          onStopGenerate={stopGenerate}
         />
       )}
     </div>

@@ -589,6 +589,139 @@ async def chat(
     )
 
 
+# ---------- 计划重新生成：POST /api/plans/{plan_id}/generate ----------
+# 与 /api/chat 同构，但绑定既有计划：ctx.target_plan_id 让 Agent 的 create_plan
+# 就地覆写而非新建；管道同样后台执行，断连不取消。
+
+REGENERATE_PROMPT = "请根据照片帮我按断舍离的方法整理，重新生成这个整理计划（区域、总结、评分与可执行任务）。"
+
+
+async def _plan_generate_stream(request: Request, plan_id: int) -> AsyncIterator[str]:
+    """计划重新生成 SSE：视觉→Agent（create_plan 覆写该计划）→事件流。"""
+    plan = db.get_plan(plan_id)
+    photos = plan["photos"]
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def pipeline() -> None:
+        summaries: List[str] = []
+        messiness = "low"
+        messiness_rank = {"low": 0, "medium": 1, "high": 2}
+
+        if not photos:
+            queue.put_nowait(sse_event("error", {
+                "message": "该计划还没有照片，先点卡片上传照片再触发生成",
+                "stage": "plan",
+            }))
+            queue.put_nowait(sse_event("done", {"messageId": None}))
+            return
+
+        # 清场：重刷该计划照片下的物品 + 未完成任务（已完成任务保留进账本）
+        db.delete_plan_photo_items(plan_id)
+        db.delete_plan_pending_tasks(plan_id)
+
+        # ① 视觉识别
+        queue.put_nowait(sse_event("vision_start", {"photoIds": [p["id"] for p in photos]}))
+        for p in photos:
+            img_path = db.DATA_DIR / p["path"]
+            try:
+                raw = img_path.read_bytes()
+            except OSError as e:
+                queue.put_nowait(sse_event("error", {"message": f"照片文件缺失：{e}", "stage": "vision"}))
+                continue
+            try:
+                result = await vision.recognize(raw, room_hint=p.get("room") or "")
+            except LLMUnavailable as e:
+                queue.put_nowait(sse_event("error", {"message": str(e), "stage": "vision"}))
+                queue.put_nowait(sse_event("done", {"messageId": None}))
+                return
+            except Exception as e:  # noqa: BLE001 — 模型超时/5xx 等不裸断流
+                logger.exception("视觉识别失败")
+                queue.put_nowait(sse_event("error", {"message": f"视觉识别失败：{e}", "stage": "vision"}))
+                queue.put_nowait(sse_event("done", {"messageId": None}))
+                return
+            db.update_photo_vision(p["id"], result.room, result.vision_text)
+            if messiness_rank.get(result.messiness, 0) > messiness_rank.get(messiness, 0):
+                messiness = result.messiness
+            summaries.append(result.to_summary())
+            queue.put_nowait(sse_event("vision_done", {
+                "photoId": p["id"], "room": result.room, "messiness": result.messiness,
+                "items": result.items, "suspected": result.suspected, "degraded": result.degraded,
+            }))
+        queue.put_nowait(sse_event("thought", {"node": "识别完成→开始评估", "status": "done"}))
+
+        # ② Agent 编排（绑定 target_plan_id）
+        ctx = ToolContext(
+            conversation_id=plan.get("conversation_id"),
+            target_plan_id=plan_id,
+            photo_ids=[p["id"] for p in photos],
+            messiness=messiness,
+        )
+        messages = agent.build_messages([], REGENERATE_PROMPT, summaries)
+
+        async def on_event(ev: dict) -> None:
+            if ev["type"] == "tool_call":
+                queue.put_nowait(sse_event("tool_call", {"name": ev["name"], "args": ev["args"]}))
+            elif ev["type"] == "tool_result":
+                queue.put_nowait(
+                    sse_event("tool_result", {"name": ev["name"], "ok": ev["ok"], "summary": ev["summary"]})
+                )
+            else:
+                queue.put_nowait(sse_event("thought", ev))
+
+        try:
+            result = await agent.run_agent(messages, ctx, on_event)
+        except LLMUnavailable as e:
+            queue.put_nowait(sse_event("error", {"message": str(e), "stage": "agent"}))
+            queue.put_nowait(sse_event("done", {"messageId": None}))
+            return
+        except Exception as e:  # noqa: BLE001 — 兑底，不让管道裸断
+            logger.exception("Agent 编排失败")
+            queue.put_nowait(sse_event("error", {"message": f"Agent 编排失败：{e}", "stage": "agent"}))
+            queue.put_nowait(sse_event("done", {"messageId": None}))
+            return
+
+        # ③ 最终文本分段推送
+        text = result.text.strip() or "已重新生成整理计划，请到任务看板查看可执行清单。"
+        for i in range(0, len(text), DELTA_CHUNK):
+            queue.put_nowait(sse_event("message_delta", {"delta": text[i:i + DELTA_CHUNK]}))
+
+        # ④ 计划卡片事件 + 收尾
+        if ctx.last_plan:
+            queue.put_nowait(sse_event("plan_created", {
+                "planId": ctx.last_plan["plan_id"],
+                "danshariScore": ctx.last_plan["danshari_score"],
+                "taskCount": ctx.last_plan.get("task_count", 0),
+            }))
+        queue.put_nowait(sse_event("done", {"messageId": None}))
+
+    task = asyncio.create_task(pipeline())
+    task.add_done_callback(lambda _: queue.put_nowait(_PIPELINE_END))
+
+    while True:
+        if await request.is_disconnected():
+            logger.info("客户端断开，计划生成继续后台执行（plan=%s）", plan_id)
+            return
+        try:
+            item = await asyncio.wait_for(queue.get(), timeout=0.25)
+        except asyncio.TimeoutError:
+            continue
+        if item is _PIPELINE_END:
+            return
+        yield item
+
+
+@app.post("/api/plans/{plan_id}/generate")
+async def plan_generate(plan_id: int, request: Request):
+    """手动触发生成/重新生成：按计划照片重跑视觉→Agent，就地覆写该计划。"""
+    if not db.get_plan(plan_id):
+        raise HTTPException(404, "计划不存在")
+    return StreamingResponse(
+        _plan_generate_stream(request, plan_id),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 # ---------- LLM 模型设置（§4：读取/保存/测试连接）----------
 
 @app.get("/api/settings/llm")
