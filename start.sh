@@ -22,6 +22,21 @@ warn() { printf "\033[33m[dobby]\033[0m %s\n" "$*"; }
 
 listeners() { lsof -ti :"$1" -sTCP:LISTEN 2>/dev/null || true; }
 
+# 数据库可写性探针：端口活着 ≠ 数据库能写（曾出现迁移后进程僵死、写报 readonly/locked 的坑）
+db_healthy() {
+  .venv/bin/python - <<'PY' 2>/dev/null
+import sqlite3, sys
+DB = 'server/data/app.db'
+try:
+    c = sqlite3.connect(DB)
+    c.execute('BEGIN IMMEDIATE')
+    c.rollback()
+    sys.exit(0)
+except Exception:
+    sys.exit(1)
+PY
+}
+
 do_stop() {
   for pidfile in "$BACKEND_PID" "$FRONTEND_PID"; do
     if [ -f "$pidfile" ]; then
@@ -46,6 +61,13 @@ case "${1:-run}" in
       port=${pair%%:*}; name=${pair##*:}
       if [ -n "$(listeners "$port")" ]; then
         log "$name 运行中 (端口 $port)"
+        if [ "$port" = "8000" ]; then
+          if db_healthy; then
+            log "  数据库可写：健康"
+          else
+            warn "  数据库不可写：进程疑似僵死，建议 ./start.sh stop && ./start.sh -d"
+          fi
+        fi
       else
         warn "$name 未运行"
       fi
