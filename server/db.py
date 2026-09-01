@@ -476,7 +476,29 @@ def _plan_photos(plan_id: int) -> List[Dict[str, Any]]:
     ).fetchall())
 
 
-def get_plan(plan_id: int) -> Optional[Dict[str, Any]]:
+def _plan_hesitate_count(plan_id: int) -> int:
+    """计划关联照片下处于 90 天观察期的物品数（hesitate_count）。"""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM items"
+        " WHERE keep_status = 'hesitate' AND photo_id IN"
+        " (SELECT photo_id FROM plan_photos WHERE plan_id = ?)",
+        (plan_id,),
+    ).fetchone()
+    return int(row["n"])
+
+
+def _plan_items(plan_id: int) -> List[Dict[str, Any]]:
+    """计划关联照片下的全部物品（判定色带/物品名展示用）。"""
+    conn = get_conn()
+    return _rows_to_dicts(conn.execute(
+        "SELECT i.* FROM items i JOIN plan_photos pp ON pp.photo_id = i.photo_id"
+        " WHERE pp.plan_id = ? ORDER BY i.id",
+        (plan_id,),
+    ).fetchall())
+
+
+def get_plan(plan_id: int, with_items: bool = True) -> Optional[Dict[str, Any]]:
     conn = get_conn()
     row = conn.execute("SELECT * FROM plans WHERE id = ?", (plan_id,)).fetchone()
     if not row:
@@ -484,6 +506,8 @@ def get_plan(plan_id: int) -> Optional[Dict[str, Any]]:
     d = dict(row)
     d["tasks"] = list_tasks(plan_id=plan_id)
     d["photos"] = _plan_photos(plan_id)
+    d["hesitate_count"] = _plan_hesitate_count(plan_id)
+    d["items"] = _plan_items(plan_id) if with_items else []
     return d
 
 
@@ -495,7 +519,7 @@ def list_plans(status: Optional[str] = None) -> List[Dict[str, Any]]:
         ).fetchall()
     else:
         rows = conn.execute("SELECT * FROM plans ORDER BY id DESC").fetchall()
-    return [get_plan(row["id"]) for row in rows]
+    return [get_plan(row["id"], with_items=False) for row in rows]
 
 
 def update_plan_status(plan_id: int, status: str) -> Optional[Dict[str, Any]]:

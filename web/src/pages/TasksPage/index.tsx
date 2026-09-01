@@ -16,7 +16,7 @@ export const TASK_TYPE_META: Record<string, { label: string; color: string }> = 
   discard: { label: '舍弃', color: 'red' },
 };
 
-const TASK_STATUS_LABEL: Record<string, string> = {
+export const TASK_STATUS_LABEL: Record<string, string> = {
   todo: '待开始',
   doing: '进行中',
   done: '已完成',

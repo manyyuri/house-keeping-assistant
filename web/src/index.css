@@ -621,14 +621,578 @@ body {
   outline-offset: 2px;
 }
 
-/* ---- 计划卡片：可点击进详情补照片 ---- */
-.plan-history-card.ant-card {
-  cursor: pointer;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+/* ---- 整理计划：家的地图（列表 = 下一步一句话，抽屉 = 走进房间）---- */
+
+.plans-page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 16px 16px 80px;
 }
-.plan-history-card.ant-card:hover {
+
+.plans-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.plans-title.ant-typography {
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.plans-sub {
+  font-size: 12.5px;
+}
+
+.plans-empty {
+  margin: 48px auto 0;
+  max-width: 320px;
+  text-align: center;
+}
+
+/* ---- 列表卡片：照片 + 房间 + 一句话，安静但不失信息 ---- */
+
+.plan-card {
+  appearance: none;
+  border: 1px solid var(--mist);
+  background: #fff;
+  border-radius: 14px;
+  padding: 12px 14px;
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease;
+}
+
+.plan-card:hover {
   border-color: var(--leaf);
-  box-shadow: 0 2px 10px rgba(62, 107, 82, 0.08);
+  box-shadow: 0 4px 18px rgba(62, 107, 82, 0.1);
+}
+
+.plan-card:active {
+  transform: scale(0.985);
+}
+
+.plan-card:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+.plan-card-thumb {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--mist);
+  background: var(--mist);
+}
+
+.plan-card-thumb-empty {
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  background: #f4f2ec;
+}
+
+.plan-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.plan-card-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.plan-card-room {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plan-card-date {
+  flex: none;
+  font-size: 11.5px;
+  color: rgba(38, 51, 44, 0.45);
+}
+
+.plan-next {
+  margin-top: 4px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: rgba(38, 51, 44, 0.62);
+}
+
+.plan-chips {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.plan-chip {
+  font-size: 11.5px;
+  padding: 2px 9px;
+  border-radius: 99px;
+  border: 1px solid;
+}
+
+.plan-chip.discard {
+  color: var(--seal);
+  border-color: rgba(179, 64, 42, 0.35);
+  background: rgba(179, 64, 42, 0.05);
+}
+
+.plan-chip.hesitate {
+  color: var(--grain);
+  border-color: rgba(185, 138, 78, 0.4);
+  background: rgba(185, 138, 78, 0.06);
+}
+
+.plan-chip.keep {
+  color: var(--pine);
+  border-color: rgba(62, 107, 82, 0.35);
+  background: rgba(62, 107, 82, 0.05);
+}
+
+.plan-card-foot {
+  margin-top: 8px;
+}
+
+.plan-progress {
+  display: block;
+  height: 3px;
+  border-radius: 99px;
+  background: var(--mist);
+  overflow: hidden;
+}
+
+.plan-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--pine);
+  border-radius: 99px;
+}
+
+.plan-card-arrow {
+  flex: none;
+  margin-top: 27px;
+  color: rgba(38, 51, 44, 0.3);
+  font-size: 13px;
+}
+
+/* ---- 抽屉：走进一个房间 ---- */
+
+.plan-drawer-room {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+}
+
+.plan-drawer-date {
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(38, 51, 44, 0.45);
+}
+
+.plan-drawer-close {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: rgba(38, 51, 44, 0.4);
+  font-size: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.plan-drawer-close:hover {
+  background: var(--mist);
+  color: var(--ink);
+}
+
+.plan-drawer-close:focus-visible,
+.plan-drawer-ghost:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+.plan-drawer-photos {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.plan-drawer-photo {
+  border-radius: 10px;
+  border: 1px solid var(--mist);
+  object-fit: cover;
+}
+
+.plan-drawer-ghost {
+  appearance: none;
+  border: 1px solid var(--mist);
+  background: #fff;
+  color: var(--pine);
+  border-radius: 9px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.plan-drawer-ghost:hover {
+  border-color: var(--leaf);
+  background: rgba(127, 183, 126, 0.06);
+}
+
+.plan-drawer-ghost:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.plan-verdict {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: rgba(233, 230, 222, 0.35);
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.75;
+  color: rgba(38, 51, 44, 0.8);
+}
+
+.plan-section {
+  margin-top: 20px;
+}
+
+.plan-section-title {
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.plan-section-title small {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(38, 51, 44, 0.4);
+  letter-spacing: 0.02em;
+}
+
+/* 三层筛子：语义即颜色（舍弃=朱印·观察期=半格·保留=满格） */
+
+.sieve {
+  margin-top: 8px;
+  border: 1px solid var(--mist);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.sieve-band {
+  appearance: none;
+  border: none;
+  background: transparent;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.sieve-band:hover {
+  background: #fbfaf7;
+}
+
+.sieve-band:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: -2px;
+}
+
+.sieve-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.sieve-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sieve-count {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sieve-due {
+  font-size: 11.5px;
+  color: rgba(38, 51, 44, 0.5);
+}
+
+.sieve-chevron {
+  font-size: 11px;
+  color: rgba(38, 51, 44, 0.4);
+  transition: transform 0.18s ease;
+}
+
+.sieve-chevron.open {
+  transform: rotate(180deg);
+}
+
+.sieve-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+
+.sieve-chip {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: #f4f2ec;
+  color: rgba(38, 51, 44, 0.75);
+}
+
+.sieve.discard .sieve-dot { background: var(--seal); }
+.sieve.discard .sieve-count { color: var(--seal); }
+.sieve.hesitate .sieve-dot { background: var(--grain); }
+.sieve.hesitate .sieve-count { color: var(--grain); }
+.sieve.keep .sieve-dot { background: var(--pine); }
+.sieve.keep .sieve-count { color: var(--pine); }
+.sieve.donate .sieve-dot { background: var(--leaf); }
+.sieve.donate .sieve-count { color: var(--leaf); }
+
+/* 任务：按时限分组 + 就地打勾（诚实记账） */
+
+.task-group-title {
+  margin-top: 14px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: rgba(38, 51, 44, 0.5);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-group-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--mist);
+}
+
+.task-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--mist);
+}
+
+.task-row:last-child {
+  border-bottom: none;
+}
+
+.task-row-done {
+  opacity: 0.72;
+}
+
+.task-check {
+  appearance: none;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--mist);
+  margin-top: 1px;
+  background: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  color: transparent;
+  font-size: 12px;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.task-check:hover {
+  border-color: var(--pine);
+}
+
+.task-check:active {
+  transform: scale(0.9);
+}
+
+.task-check:focus-visible {
+  outline: 2px solid var(--leaf);
+  outline-offset: 2px;
+}
+
+.task-check:disabled {
+  opacity: 0.5;
+}
+
+.task-check.done {
+  background: var(--seal);
+  border-color: var(--seal);
+  color: #fff;
+}
+
+.task-main {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.task-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.task-title.done {
+  color: rgba(38, 51, 44, 0.45);
+  text-decoration: line-through;
+  font-weight: 400;
+}
+
+.task-type {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 5px;
+  margin-right: 7px;
+  vertical-align: 1px;
+}
+
+.task-type.discard { color: var(--seal); background: rgba(179, 64, 42, 0.08); }
+.task-type.organize { color: var(--pine); background: rgba(62, 107, 82, 0.08); }
+.task-type.store { color: #722ed1; background: rgba(114, 46, 209, 0.07); }
+.task-type.clean { color: #1677ff; background: rgba(22, 119, 255, 0.07); }
+
+.task-meta {
+  font-size: 11.5px;
+  color: rgba(38, 51, 44, 0.5);
+  margin-top: 2px;
+}
+
+.task-expand {
+  color: var(--pine);
+  font-size: 11.5px;
+}
+
+.task-steps {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: rgba(38, 51, 44, 0.72);
+}
+
+/* 生成中 / 空计划 */
+
+.plan-generating {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(127, 183, 126, 0.08);
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: var(--pine);
+}
+
+.plan-generating-spin {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--leaf);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: plan-spin 0.8s linear infinite;
+}
+
+@keyframes plan-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.plan-empty {
+  margin-top: 12px;
+  padding: 18px 14px;
+  border: 1px dashed var(--mist);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  font-size: 13px;
+  color: rgba(38, 51, 44, 0.55);
+}
+
+.plan-foot-actions {
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--mist);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-card {
+    transition: none;
+  }
+
+  .plan-generating-spin,
+  .sieve-chevron {
+    animation: none;
+    transition: none;
+  }
 }
 
 /* 快门闪光：照片进入的一瞬 */

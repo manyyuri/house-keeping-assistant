@@ -1,35 +1,179 @@
-/** 整理计划中心：新建计划 + 点计划补照片 + 按批次回看照片、计划结论与任务完成度。 */
+/** 整理计划：家的地图。
+ * 列表 = 一眼看清每间房的「下一步」（照片 + 一句话），不堆数据；
+ * 点卡片 = 抽屉「走进一个房间」：三层筛子判定（舍弃/观察期/保留）展开物品名，
+ * 任务按时限分组、就地打勾完成（诚实记账，非打卡）。生成/补照片退为次要动作。
+ */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   App as AntApp,
   Button,
-  Card,
+  Drawer,
   Empty,
   Form,
+  Grid,
   Image,
   Input,
-  List,
   Modal,
-  Progress,
-  Space,
-  Tag,
+  Row,
+  Col,
   Typography,
 } from 'antd';
-import { PlusOutlined, ThunderboltOutlined, UploadOutlined } from '@ant-design/icons';
+import {
+  CheckOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+  RightOutlined,
+  UploadOutlined,
+} from '@ant-design/icons';
 import * as api from '../../api';
 import { useBusinessStore } from '../../stores';
-import type { Plan } from '../../types';
+import { TASK_TYPE_META } from '../TasksPage';
+import type { Item, Plan, Task } from '../../types';
 
 const { Text, Title } = Typography;
+const { useBreakpoint } = Grid;
 
 function photoUrl(path: string): string {
   const relative = path.startsWith('photos/') ? path.slice('photos/'.length) : path;
   return `/api/photos/${relative}`;
 }
 
-/** 计划详情弹窗：查看照片/结论/任务进度，上传照片挂到该计划，并手动触发生成。 */
-function PlanDetailModal({
+/* ---------- 派生：卡片「下一步」一句话 + 任务分组（信息即结构，用省力语汇） ---------- */
+
+function pendingOf(tasks: Task[]): Task[] {
+  return tasks.filter((t) => t.status !== 'done' && t.status !== 'skipped');
+}
+
+function nextStepLine(plan: Plan): string {
+  const tasks = plan.tasks ?? [];
+  const pending = pendingOf(tasks);
+
+  // 还没生成：无总结/无计数/无任务
+  const hasData =
+    plan.danshari_score != null ||
+    (plan.discard_count ?? 0) > 0 ||
+    (plan.donate_count ?? 0) > 0 ||
+    (plan.keep_count ?? 0) > 0 ||
+    (plan.hesitate_count ?? 0) > 0 ||
+    tasks.length > 0;
+  if (!hasData) return '还没生成计划，点进去按一下';
+
+  // 全部干完（加分制：不消失，如实说干完了）
+  if (tasks.length && !pending.length) {
+    return tasks.length > 1 ? `这间房的 ${tasks.length} 件小事都做完了` : '这间房的活儿都干完了';
+  }
+
+  const today = pending.filter((t) => t.due_date === 'today');
+  const todayMin = today.reduce((a, t) => a + (t.est_minutes ?? 0), 0);
+  const parts: string[] = [];
+  if (today.length) parts.push(`今天可做 ${today.length} 件小事（约 ${todayMin} 分钟）`);
+  else if (pending.length) {
+    const min = pending.reduce((a, t) => a + (t.est_minutes ?? 0), 0);
+    parts.push(`还有 ${pending.length} 件待办（约 ${min} 分钟）`);
+  }
+  if (plan.hesitate_count) {
+    const due = earliestQuarantine(plan.items ?? []);
+    parts.push(due ? `${plan.hesitate_count} 件在观察期 · ${due} 到期` : `${plan.hesitate_count} 件在观察期`);
+  }
+  if (!parts.length) return '已判定，点进去看看';
+  return parts.join(' · ');
+}
+
+/** 观察期最早到期日（MM-DD），给「再看一眼」一个锚点 */
+function earliestQuarantine(items: Item[]): string | null {
+  let earliest: string | null = null;
+  for (const it of items) {
+    if (!it.quarantine_until) continue;
+    if (!earliest || it.quarantine_until < earliest) earliest = it.quarantine_until;
+  }
+  if (!earliest) return null;
+  const [, m, d] = earliest.split('-');
+  return m && d ? `${Number(m)}-${Number(d)}` : null;
+}
+
+const DUE_LABEL: Record<string, string> = { today: '今天', weekend: '周末', later: '之后', week: '之后' };
+
+function groupTasks(tasks: Task[]): { groups: { key: string; label: string; items: Task[] }[]; done: Task[] } {
+  const pending = pendingOf(tasks).slice().sort((a, b) => a.id - b.id);
+  const groups = [
+    { key: 'today', label: '今天', items: [] as Task[] },
+    { key: 'weekend', label: '周末', items: [] as Task[] },
+    { key: 'later', label: '之后', items: [] as Task[] },
+  ];
+  for (const t of pending) {
+    const g = t.due_date && DUE_LABEL[t.due_date] ? (t.due_date === 'today' ? 'today' : t.due_date === 'weekend' ? 'weekend' : 'later') : 'later';
+    const found = groups.find((x) => x.key === g);
+    if (found) found.items.push(t);
+    else groups[2].items.push(t);
+  }
+  const nonEmpty = groups.filter((g) => g.items.length);
+  const done = tasks.filter((t) => t.status === 'done' || t.status === 'skipped').sort((a, b) => a.id - b.id);
+  return { groups: nonEmpty, done };
+}
+
+/* ---------- 列表卡片：照片 + 房间名 + 下一步一句话（唯一的记忆点） ---------- */
+
+function PlanCard({ plan, onClick }: { plan: Plan; onClick: () => void }) {
+  const tasks = plan.tasks ?? [];
+  const done = tasks.filter((t) => t.status === 'done').length;
+  const percent = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+  const photo = plan.photos?.[0];
+  const chips: { cls: string; label: string }[] = [];
+  if (plan.discard_count) chips.push({ cls: 'discard', label: `丢 ${plan.discard_count}` });
+  if (plan.hesitate_count) chips.push({ cls: 'hesitate', label: `观察 ${plan.hesitate_count}` });
+  if (plan.keep_count) chips.push({ cls: 'keep', label: `留 ${plan.keep_count}` });
+
+  return (
+    <button className="plan-card" onClick={onClick} aria-label={`打开「${plan.room}」的整理计划`}>
+      {photo ? (
+        <Image
+          className="plan-card-thumb"
+          src={photoUrl(photo.path)}
+          alt={`${plan.room} 照片`}
+          preview={false}
+          width={72}
+          height={72}
+        />
+      ) : (
+        <span className="plan-card-thumb plan-card-thumb-empty">📷</span>
+      )}
+      <span className="plan-card-body">
+        <span className="plan-card-title">
+          <span className="plan-card-room">{plan.room}</span>
+          <span className="plan-card-date">{plan.created_at ? plan.created_at.slice(5, 10) : ''} · {plan.photos?.length ?? 0} 张</span>
+        </span>
+        <span className="plan-next">{nextStepLine(plan)}</span>
+        {chips.length ? (
+          <span className="plan-chips">
+            {chips.map((c) => (
+              <span key={c.cls} className={`plan-chip ${c.cls}`}>{c.label}</span>
+            ))}
+          </span>
+        ) : null}
+        {tasks.length ? (
+          <span className="plan-card-foot">
+            <span className="plan-progress">
+              <span className="plan-progress-fill" style={{ width: `${percent}%` }} />
+            </span>
+          </span>
+        ) : null}
+      </span>
+      <RightOutlined className="plan-card-arrow" />
+    </button>
+  );
+}
+
+/* ---------- 抽屉：走进一个房间（判定三层筛子 + 任务就地打勾） ---------- */
+
+const SIEVE_META = [
+  { key: 'discard', label: '舍弃', cls: 'discard' },
+  { key: 'hesitate', label: '观察期', cls: 'hesitate' },
+  { key: 'keep', label: '保留', cls: 'keep' },
+  { key: 'donate', label: '捐赠', cls: 'donate' },
+] as const;
+
+function PlanDrawer({
   plan,
   genId,
   onClose,
@@ -45,13 +189,17 @@ function PlanDetailModal({
   onStopGenerate: () => void;
 }) {
   const { message } = AntApp.useApp();
+  const screens = useBreakpoint();
+  const isMobile = !screens.md;
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [openSieve, setOpenSieve] = useState<string[]>([]);
+  const [openSteps, setOpenSteps] = useState<Set<number>>(new Set());
+  const [toggling, setToggling] = useState<number | null>(null);
 
   const tasks = plan.tasks ?? [];
-  const done = tasks.filter((task) => task.status === 'done').length;
-  const percent = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
   const photos = plan.photos ?? [];
+  const { groups, done } = groupTasks(tasks);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || !files.length) return;
@@ -66,48 +214,103 @@ function PlanDetailModal({
         ids.push(res.photoId);
       }
       const updated = await api.attachPlanPhotos(plan.id, ids);
-      message.success(`已添加 ${updated.added} 张照片到「${plan.room}」`);
+      message.success(`已补 ${updated.added} 张照片到「${plan.room}」`);
       onUploaded(updated.plan);
     } catch (e) {
-      message.error(`添加失败：${e instanceof Error ? e.message : e}`);
+      message.error(`补照片失败：${e instanceof Error ? e.message : e}`);
     } finally {
       setUploading(false);
     }
   };
 
+  const toggleTask = async (task: Task) => {
+    if (toggling !== null) return;
+    const next = task.status === 'done' ? 'todo' : 'done';
+    setToggling(task.id);
+    try {
+      await api.patchTask(task.id, next);
+      const fresh = await api.getPlan(plan.id);
+      onUploaded(fresh); // 复用：刷新抽屉 + 版本号由上层 bump
+      if (next === 'done') message.success('记下了，这一件做完了');
+      else message.info('改回待办了');
+    } catch (e) {
+      message.error(`更新失败：${e instanceof Error ? e.message : e}`);
+    } finally {
+      setToggling(null);
+    }
+  };
+
+  const toggleSieve = (key: string) =>
+    setOpenSieve((s) => (s.includes(key) ? s.filter((k) => k !== key) : [...s, key]));
+
+  const toggleSteps = (id: number) =>
+    setOpenSteps((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+
+  const itemsByStatus = (key: string) => (plan.items ?? []).filter((it) => it.keep_status === key);
+
+  const generating = genId === plan.id;
+
   return (
-    <Modal
-      title={`${plan.room} · 整理计划`}
+    <Drawer
+      title={null}
+      placement="right"
+      width={isMobile ? '100%' : 440}
       open
-      onCancel={onClose}
-      footer={null}
+      onClose={onClose}
       destroyOnHidden
+      closable={false}
+      styles={{ body: { padding: '0 20px 40px', overflowY: 'auto' } }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          {plan.created_at ?? '未记录时间'}
-        </Text>
-        <Tag color={plan.status === 'completed' ? 'green' : 'blue'}>
-          {plan.status === 'completed' ? '已完成' : '进行中'}
-        </Tag>
+      {/* 头部：房间名 + 状态 */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div className="plan-drawer-room">{plan.room}</div>
+          <div className="plan-drawer-date">
+            {plan.created_at ?? ''} · {photos.length} 张照片
+          </div>
+        </div>
+        <button
+          className="plan-drawer-close"
+          onClick={onClose}
+          aria-label="关闭"
+        >
+          ✕
+        </button>
       </div>
 
-      {plan.summary && <Text style={{ display: 'block', marginTop: 10 }}>{plan.summary}</Text>}
-
-      <div style={{ marginTop: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <Text strong>照片（{photos.length} 张）</Text>
-          <Button
-            size="small"
-            type="primary"
-            ghost
-            icon={<UploadOutlined />}
-            loading={uploading}
-            onClick={() => fileRef.current?.click()}
-          >
-            上传照片
-          </Button>
-        </div>
+      {/* 照片带 + 补照片 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14 }}>
+        {photos.length ? (
+          <div className="plan-drawer-photos">
+            {photos.map((p) => (
+              <Image
+                key={p.id}
+                className="plan-drawer-photo"
+                src={photoUrl(p.path)}
+                alt={`计划照片 ${p.id}`}
+                width={64}
+                height={64}
+                preview
+              />
+            ))}
+          </div>
+        ) : (
+          <Text type="secondary" style={{ fontSize: 12.5 }}>
+            还没有照片
+          </Text>
+        )}
+        <button
+          className="plan-drawer-ghost"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+        >
+          <UploadOutlined /> {uploading ? '上传中…' : '补照片'}
+        </button>
         <input
           ref={fileRef}
           type="file"
@@ -119,142 +322,152 @@ function PlanDetailModal({
             e.target.value = '';
           }}
         />
-        {photos.length ? (
-          <Space size={8} wrap style={{ marginTop: 10 }}>
-            {photos.map((p) => (
-              <Image
-                key={p.id}
-                src={photoUrl(p.path)}
-                alt={`计划照片 ${p.id}`}
-                width={80}
-                height={80}
-                preview
-                style={{ objectFit: 'cover', borderRadius: 8 }}
-              />
-            ))}
-          </Space>
+      </div>
+
+      {/* 一句结论 */}
+      {plan.summary ? <div className="plan-verdict">{plan.summary}</div> : null}
+
+      {/* 判定：三层筛子（舍弃 / 观察期 / 保留），展开看物品名 */}
+      <div className="plan-section">
+        <div className="plan-section-title">判定 <small>三层筛子，逐层过</small></div>
+        {SIEVE_META.map((m) => {
+          const items = itemsByStatus(m.key);
+          if (!items.length) return null;
+          const open = openSieve.includes(m.key);
+          const due = m.key === 'hesitate' ? earliestQuarantine(items) : null;
+          return (
+            <div key={m.key} className={`sieve ${m.cls}`}>
+              <button className="sieve-band" onClick={() => toggleSieve(m.key)} aria-expanded={open}>
+                <span className="sieve-dot" />
+                <span className="sieve-label">{m.label}</span>
+                <span className="sieve-count">{items.length}</span>
+                {m.key === 'hesitate' && due ? <span className="sieve-due">· {due} 到期</span> : null}
+                <span style={{ flex: 1 }} />
+                <span className={`sieve-chevron${open ? ' open' : ''}`}>▾</span>
+              </button>
+              {open ? (
+                <div className="sieve-items">
+                  {items.map((it) => (
+                    <span key={it.id} className="sieve-chip">{it.name}{it.quantity > 1 ? ` ×${it.quantity}` : ''}</span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 任务：按时限分组，就地打勾 */}
+      <div className="plan-section">
+        <div className="plan-section-title">
+          任务 <small>{groups.reduce((a, g) => a + g.items.length, 0) + done.length} 件</small>
+        </div>
+
+        {generating ? (
+          <div className="plan-generating">
+            <span className="plan-generating-spin" />
+            <span>正在识别照片、编排任务…</span>
+            <button className="plan-drawer-ghost" onClick={onStopGenerate}>停止</button>
+          </div>
+        ) : null}
+
+        {!tasks.length ? (
+          <div className="plan-empty">
+            <Text>照片还在，计划还没长出来。</Text>
+            <Button
+              type="primary"
+              ghost
+              icon={<ReloadOutlined />}
+              disabled={!photos.length || generating}
+              loading={generating}
+              onClick={() => onGenerate(plan)}
+            >
+              {photos.length ? '按一下，把照片变成任务' : '先补照片再生成'}
+            </Button>
+          </div>
         ) : (
-          <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
-            还没有照片——拍一组或从相册选，点右上角「上传照片」挂进来。
-          </Text>
+          <>
+            {groups.map((g) => (
+              <div key={g.key}>
+                <div className="task-group-title">{g.label}</div>
+                {g.items.map((t) => {
+                  const meta = TASK_TYPE_META[t.type] ?? { label: t.type, color: 'default' };
+                  const expanded = openSteps.has(t.id);
+                  return (
+                    <div key={t.id} className="task-row">
+                      <button
+                        className="task-check"
+                        onClick={() => void toggleTask(t)}
+                        aria-label={`标记完成：${t.title}`}
+                        disabled={toggling === t.id}
+                      >
+                        <CheckOutlined />
+                      </button>
+                      <div className="task-main" onClick={() => toggleSteps(t.id)}>
+                        <div className="task-title">
+                          <span className={`task-type ${t.type}`}>{meta.label}</span>
+                          {t.title}
+                        </div>
+                        <div className="task-meta">
+                          {t.est_minutes ? `约 ${t.est_minutes} 分钟` : ''}
+                          {expanded && t.steps?.length ? (
+                            <ol className="task-steps">
+                              {t.steps.map((s, i) => (
+                                <li key={i}>{s}</li>
+                              ))}
+                            </ol>
+                          ) : (
+                            <span className="task-expand">{expanded ? '' : '步骤 ▾'}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            {done.length ? (
+              <div key="done">
+                <div className="task-group-title">已完成 <small style={{ fontWeight: 400 }}>{done.length} 件，做过了就留在账本里</small></div>
+                {done.map((t) => (
+                  <div key={t.id} className="task-row task-row-done">
+                    <button
+                      className="task-check done"
+                      onClick={() => void toggleTask(t)}
+                      aria-label={`改回待办：${t.title}`}
+                      disabled={toggling === t.id}
+                    >
+                      <CheckOutlined />
+                    </button>
+                    <div className="task-main">
+                      <div className="task-title done">{t.title}</div>
+                      <div className="task-meta">已完成{t.status === 'skipped' ? '（跳过）' : ''}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </>
         )}
       </div>
 
-      <div style={{ marginTop: 16 }}>
-        <Button
-          type="primary"
-          icon={<ThunderboltOutlined />}
-          disabled={!photos.length}
-          loading={genId === plan.id}
-          onClick={() => onGenerate(plan)}
-        >
-          {photos.length ? (genId === plan.id ? '生成中…' : '生成整理计划') : '先上传照片'}
-        </Button>
-        {genId === plan.id && (
-          <Button size="small" style={{ marginLeft: 8 }} onClick={onStopGenerate}>
-            停止
-          </Button>
-        )}
-        <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 6 }}>
-          {photos.length
-            ? '按照片重新识别物品并生成/更新计划（保留已完成任务与账本）'
-            : '需要至少一张照片才能生成'}
-        </Text>
-      </div>
-
-      <div style={{ marginTop: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-          <Text type="secondary">任务进度</Text>
-          <Text type="secondary">
-            {done}/{tasks.length} 已完成
-          </Text>
-        </div>
-        <Progress percent={percent} size="small" showInfo={false} />
-        {tasks.length === 0 && (
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            还没有任务，去对话里说「帮我按断舍离整理」生成。
-          </Text>
-        )}
-      </div>
-    </Modal>
-  );
-}
-
-function PlanEntry({ plan, genId, onClick, onGenerate }: {
-  plan: Plan;
-  genId: number | null;
-  onClick: (p: Plan) => void;
-  onGenerate: (plan: Plan) => void;
-}) {
-  const tasks = plan.tasks ?? [];
-  const done = tasks.filter((task) => task.status === 'done').length;
-  const percent = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
-
-  return (
-    <Card size="small" className="plan-history-card" onClick={() => onClick(plan)}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
-        <div>
-          <Title level={5} style={{ margin: 0 }}>
-            {plan.room} · 整理计划
-          </Title>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {plan.created_at ?? '未记录时间'} · {plan.photos?.length ?? 0} 张照片
-          </Text>
-        </div>
-        <Space>
-          <Tag color={plan.status === 'completed' ? 'green' : 'blue'}>
-            {plan.status === 'completed' ? '已完成' : '进行中'}
-          </Tag>
-          <Button
-            size="small"
-            type="link"
-            icon={<ThunderboltOutlined />}
-            disabled={!plan.photos?.length}
-            loading={genId === plan.id}
-            onClick={(e) => {
-              e.stopPropagation();
-              onGenerate(plan);
-            }}
+      {/* 次要动作：重新生成 */}
+      {photos.length && tasks.length ? (
+        <div className="plan-foot-actions">
+          <button
+            className="plan-drawer-ghost"
+            onClick={() => onGenerate(plan)}
+            disabled={generating}
           >
-            {plan.photos?.length ? '生成' : '无照片'}
-          </Button>
-        </Space>
-      </div>
-
-      {plan.photos?.length ? (
-        <Space size={8} style={{ marginTop: 12 }}>
-          {plan.photos.map((photo) => (
-            <span key={photo.id} onClick={(e) => e.stopPropagation()}>
-              <Image
-                src={photoUrl(photo.path)}
-                alt={`计划照片 ${photo.id}`}
-                width={64}
-                height={64}
-                preview
-                style={{ objectFit: 'cover', borderRadius: 8 }}
-              />
-            </span>
-          ))}
-        </Space>
-      ) : (
-        <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
-          此计划还没有照片，点卡片上传
-        </Text>
-      )}
-
-      {plan.summary && <Text style={{ display: 'block', marginTop: 12 }}>{plan.summary}</Text>}
-      <div style={{ marginTop: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-          <Text type="secondary">任务进度</Text>
-          <Text type="secondary">
-            {done}/{tasks.length} 已完成
-          </Text>
+            <ReloadOutlined /> {generating ? '生成中…' : '重新识别照片，重排一遍'}
+          </button>
         </div>
-        <Progress percent={percent} size="small" showInfo={false} />
-      </div>
-    </Card>
+      ) : null}
+    </Drawer>
   );
 }
+
+/* ---------- 页面：家的地图 ---------- */
 
 export default function PlansPage() {
   const { message } = AntApp.useApp();
@@ -263,7 +476,6 @@ export default function PlansPage() {
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<Plan | null>(null);
-  // 正在生成/重新生成的计划 id（一次只生成一个）
   const [genId, setGenId] = useState<number | null>(null);
   const genAbortRef = useRef<AbortController | null>(null);
 
@@ -271,7 +483,7 @@ export default function PlansPage() {
     async (plan: Plan) => {
       if (genId !== null) return;
       if (!plan.photos?.length) {
-        message.warning('该计划还没有照片，先上传照片再触发生成');
+        message.warning('该计划还没有照片，先补照片再生成');
         return;
       }
       setGenId(plan.id);
@@ -283,17 +495,15 @@ export default function PlansPage() {
           signal: controller.signal,
           onEvent: (ev) => {
             if (ev.event === 'plan_created') {
-              message.success(
-                `「${plan.room}」已生成：评分 ${ev.data.danshariScore} · ${ev.data.taskCount} 个任务`,
-              );
+              message.success(`「${plan.room}」已生成：${ev.data.taskCount} 个任务`);
             } else if (ev.event === 'error') {
               message.error(ev.data.message);
             }
           },
         });
-        bumpVersion(); // 刷新列表
+        bumpVersion();
         const fresh = await api.getPlan(plan.id);
-        setSelected((s) => (s && s.id === plan.id ? fresh : s)); // 弹窗同步刷新
+        setSelected((s) => (s && s.id === plan.id ? fresh : s));
       } catch (e) {
         if (controller.signal.aborted) message.info('已停止生成');
         else message.error(`生成失败：${e instanceof Error ? e.message : e}`);
@@ -307,23 +517,41 @@ export default function PlansPage() {
 
   const stopGenerate = useCallback(() => genAbortRef.current?.abort(), []);
 
+  // 打开抽屉先拉详情（含物品清单，筛子需要）；失败则用列表数据兜底
+  const openPlan = useCallback(async (plan: Plan) => {
+    try {
+      const detail = await api.getPlan(plan.id);
+      setSelected(detail);
+    } catch {
+      setSelected(plan);
+    }
+  }, []);
+
   useEffect(() => {
     void fetchPlans();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version]);
+
+  const refreshSelected = useCallback(
+    (updated: Plan) => {
+      setSelected(updated);
+      bumpVersion();
+    },
+    [bumpVersion],
+  );
 
   const onCreate = async () => {
     let values: { room: string; summary?: string };
     try {
       values = await form.validateFields();
     } catch {
-      return; // 校验失败，不关闭
+      return;
     }
     setCreating(true);
     try {
       await api.createPlan({ room: values.room.trim(), summary: values.summary?.trim() || undefined });
       bumpVersion();
-      message.success('计划已创建，去对话里补充照片和任务吧');
+      message.success('计划已创建，去对话里拍照片挂进来');
       setOpen(false);
       form.resetFields();
     } catch (e) {
@@ -334,34 +562,45 @@ export default function PlansPage() {
   };
 
   return (
-    <div style={{ padding: 16, maxWidth: 760, margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+    <div className="plans-page">
+      <div className="plans-head">
         <div>
-          <Title level={4} style={{ marginTop: 0 }}>
+          <Title level={4} className="plans-title">
             整理计划
           </Title>
-          <Text type="secondary">点计划卡片即可补照片；每个计划都保留它的照片和下一步。</Text>
+          <Text type="secondary" className="plans-sub">
+            一眼看清每间房，下一步是什么
+          </Text>
         </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
           新建计划
         </Button>
       </div>
-      <List
-        style={{ marginTop: 16 }}
-        dataSource={plans}
-        rowKey="id"
-        locale={{ emptyText: <Empty description="还没有整理计划，先建一个或拍一组照片吧" /> }}
-        renderItem={(plan) => (
-          <List.Item style={{ paddingInline: 0 }}>
-            <PlanEntry
-              plan={plan}
-              genId={genId}
-              onClick={(p) => setSelected(p)}
-              onGenerate={generatePlan}
-            />
-          </List.Item>
-        )}
-      />
+
+      <Row gutter={[14, 14]}>
+        {plans.map((plan) => (
+          <Col key={plan.id} xs={24} sm={12} lg={8}>
+            <PlanCard plan={plan} onClick={() => void openPlan(plan)} />
+          </Col>
+        ))}
+      </Row>
+
+      {!plans.length ? (
+        <div className="plans-empty">
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description={
+              <span>
+                还没有整理计划。拍一组照片，或先建一个房间。
+              </span>
+            }
+          />
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>
+            新建计划
+          </Button>
+        </div>
+      ) : null}
+
       <Modal
         title="新建整理计划"
         open={open}
@@ -380,15 +619,13 @@ export default function PlansPage() {
           </Form.Item>
         </Form>
       </Modal>
+
       {selected && (
-        <PlanDetailModal
+        <PlanDrawer
           plan={selected}
           genId={genId}
           onClose={() => setSelected(null)}
-          onUploaded={(updated) => {
-            setSelected(updated);
-            bumpVersion();
-          }}
+          onUploaded={refreshSelected}
           onGenerate={generatePlan}
           onStopGenerate={stopGenerate}
         />

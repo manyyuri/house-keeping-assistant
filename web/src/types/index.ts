@@ -76,6 +76,10 @@ export interface Plan {
   discard_count: number;
   donate_count: number;
   keep_count: number;
+  /** 90 天观察期物品数（后端实时聚合） */
+  hesitate_count?: number;
+  /** 计划关联照片下的物品（判定色带/物品名展示用） */
+  items?: Item[];
   status: string;
   created_at?: string;
   tasks?: Task[];
