@@ -767,8 +767,9 @@ def sync_seed_recipes(rows: List[Dict[str, Any]]) -> int:
     """把最新 seed 菜谱库同步进非空 recipes 表（保留 id，meal_plans FK 不断）。
 
     - 补 cuisine 列（老库升级）
-    - 已存在：菜系不同则更新 cuisine；若是「改名菜」则整行刷新到新内容
-    - 新菜：INSERT
+    - 已存在同名：整行刷新为最新 seed 内容（seed 为源，幂等）
+    - 改名菜：按 RECIPE_RENAMES 反查旧 id 后刷新
+    - 新菜：INSERT；从 seed 移除且无餐计划引用的旧菜：DELETE
     返回新增条数。幂等，可重复执行。
     """
     conn = get_conn()
@@ -783,7 +784,6 @@ def sync_seed_recipes(rows: List[Dict[str, Any]]) -> int:
         for old, new in RECIPE_RENAMES.items():
             if old in existing and new not in by_name:
                 by_name[new] = existing[old]
-        renamed_new = set(RECIPE_RENAMES.values())
         for r in rows:
             name = r["name"]
             row = by_name.get(name)
@@ -807,31 +807,24 @@ def sync_seed_recipes(rows: List[Dict[str, Any]]) -> int:
                 added += 1
                 continue
             rid = row["id"]
-            if name in renamed_new or row.get("cuisine") != (r.get("cuisine") or "家常"):
-                if name in renamed_new:
-                    # 整行刷新（改名菜内容可能整体变了）
-                    conn.execute(
-                        "UPDATE recipes SET name=?, meal_type=?, slots=?, ingredients=?,"
-                        " steps=?, cook_tool=?, cook_minutes=?, tags=?, cuisine=?, satiety_hint=?"
-                        " WHERE id=?",
-                        (
-                            name, r["meal_type"],
-                            json.dumps(r["slots"], ensure_ascii=False),
-                            json.dumps(r["ingredients"], ensure_ascii=False),
-                            json.dumps(r.get("steps") or [], ensure_ascii=False),
-                            r.get("cook_tool") or "none",
-                            r.get("cook_minutes"),
-                            json.dumps(r.get("tags") or [], ensure_ascii=False),
-                            r.get("cuisine") or "家常",
-                            r.get("satiety_hint"),
-                            rid,
-                        ),
-                    )
-                else:
-                    conn.execute(
-                        "UPDATE recipes SET cuisine=? WHERE id=?",
-                        (r.get("cuisine") or "家常", rid),
-                    )
+            # 整行刷新（seed 为源，幂等；保 id，meal_plans FK 不断）
+            conn.execute(
+                "UPDATE recipes SET name=?, meal_type=?, slots=?, ingredients=?,"
+                " steps=?, cook_tool=?, cook_minutes=?, tags=?, cuisine=?, satiety_hint=?"
+                " WHERE id=?",
+                (
+                    name, r["meal_type"],
+                    json.dumps(r["slots"], ensure_ascii=False),
+                    json.dumps(r["ingredients"], ensure_ascii=False),
+                    json.dumps(r.get("steps") or [], ensure_ascii=False),
+                    r.get("cook_tool") or "none",
+                    r.get("cook_minutes"),
+                    json.dumps(r.get("tags") or [], ensure_ascii=False),
+                    r.get("cuisine") or "家常",
+                    r.get("satiety_hint"),
+                    rid,
+                ),
+            )
         # 清理：已从 seed 移除、且无任何餐计划引用的旧菜（保历史，绝不删被引用行）
         seed_names = {r["name"] for r in rows}
         conn.execute(
