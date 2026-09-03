@@ -52,7 +52,10 @@ export default function MealCard({ plan, rerolling, onReroll, onStatus }: MealCa
       <div className="meal-main">
         <FistPlate slots={recipe.slots} stamped={eaten} />
         <div className="meal-main-info">
-          <div className="meal-name">{recipe.name}</div>
+          <div className="meal-name">
+            {recipe.cuisine ? <span className={`meal-cuisine c-${recipe.cuisine}`}>{recipe.cuisine}</span> : null}
+            {recipe.name}
+          </div>
           <div className="meal-chips">
             {recipe.slots.map((s) => (
               <span key={s.slot} className={`meal-chip kind-${s.kind}`}>

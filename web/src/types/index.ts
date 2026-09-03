@@ -189,6 +189,8 @@ export interface Recipe {
   cook_tool: string;
   cook_minutes: number | null;
   tags: string[];
+  /** 菜系：川菜/粤菜/韩餐/日料/泰式/家常 */
+  cuisine?: string | null;
   satiety_hint: string | null;
 }
 

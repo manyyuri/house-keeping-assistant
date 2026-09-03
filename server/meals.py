@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from server import db, meal_rules
+from server import db, meal_rules, preferences
 
 logger = logging.getLogger("danshari.meals")
 
@@ -45,6 +45,18 @@ def seed_default_recipes() -> int:
     return db.seed_recipes(valid)
 
 
+def sync_default_recipes() -> int:
+    """老库升级：把最新 seed 同步进非空 recipes 表（补 cuisine、改名菜、新菜）。
+
+    返回新增条数；已是最新时返回 0。幂等。
+    """
+    rows = json.loads(SEED_PATH.read_text(encoding="utf-8"))
+    added = db.sync_seed_recipes(rows)
+    if added:
+        logger.info("菜谱库同步：新增 %d 道（knowledge/recipes）", added)
+    return added
+
+
 # ---------- 生成 ----------
 
 def _parse_date(s: Optional[str]) -> date:
@@ -56,12 +68,18 @@ def _parse_date(s: Optional[str]) -> date:
         raise ValueError("日期格式应为 yyyy-mm-dd")
 
 
-def _pick_for(d: date, meal_type: str) -> Optional[Dict[str, Any]]:
-    """按轮换规则选一道菜谱；库太小导致轮换失败时兜底随机。"""
-    candidates = db.list_recipes(meal_type)
+def _eligible(pool: List[Dict[str, Any]], d: date, meal_type: str) -> List[Dict[str, Any]]:
+    """工作日午餐只留带饭友好（与 pick_recipe 同口径）。"""
+    if meal_type == "lunch" and not meal_rules.is_weekend(d.weekday()):
+        return [r for r in pool if meal_rules.BENTO_TAG in (r.get("tags") or [])]
+    return pool
+
+
+def _try_pick(pool: List[Dict[str, Any]], d: date, meal_type: str) -> Optional[Dict[str, Any]]:
+    """轮换选一道：先近 3 天未用，全用过放宽近 1 天，仍无则池内随机（带饭口径）。"""
     date_str = d.isoformat()
     rid = meal_rules.pick_recipe(
-        candidates,
+        pool,
         recent_3d=db.recent_recipe_ids(meal_type, date_str, days=3),
         recent_1d=db.recent_recipe_ids(meal_type, date_str, days=1),
         meal_type=meal_type,
@@ -69,10 +87,28 @@ def _pick_for(d: date, meal_type: str) -> Optional[Dict[str, Any]]:
     )
     if rid is not None:
         return db.get_recipe(rid)
-    pool = candidates
-    if meal_type == "lunch" and not meal_rules.is_weekend(d.weekday()):
-        pool = [r for r in pool if meal_rules.BENTO_TAG in (r.get("tags") or [])] or candidates
-    return random.choice(pool) if pool else None
+    elig = _eligible(pool, d, meal_type)
+    return random.choice(elig) if elig else None
+
+
+def _pick_for(d: date, meal_type: str) -> Optional[Dict[str, Any]]:
+    """按轮换规则选一道菜谱；库太小导致轮换失败时兜底随机。
+
+    口味偏好：先剔忌口食材 → 优先在偏好菜系里轮换；偏好菜系轮换耗尽再回退可吃全量。
+    """
+    candidates = db.list_recipes(meal_type)
+    prefs = preferences.load()
+    eat, fav = preferences.split_pool(candidates, prefs)
+    if not eat:  # 忌口把整库挡光 → 兜底全库（宁可换菜也别饿着）
+        eat = candidates
+    fav = [r for r in fav if r in eat]
+
+    rec = _try_pick(fav or eat, d, meal_type)
+    if rec is not None:
+        return rec
+    if fav:  # 偏好菜系被轮换耗尽了，才回退到可吃全量
+        rec = _try_pick(eat, d, meal_type)
+    return rec
 
 
 def _lunch_mode(d: date) -> str:
@@ -170,14 +206,26 @@ def reroll(date_str: str, meal_type: str) -> Dict[str, Any]:
     candidates = db.list_recipes(meal_type)
     if plan["mode"] == "bento":
         candidates = [r for r in candidates if meal_rules.BENTO_TAG in (r.get("tags") or [])]
-    exclude = set(db.recent_recipe_ids(meal_type, d.isoformat(), days=3)) | {plan["recipe_id"]}
-    pool = [r for r in candidates if r["id"] not in exclude]
-    if not pool:  # 放宽：只排除昨天与当前
-        exclude = set(db.recent_recipe_ids(meal_type, d.isoformat(), days=1)) | {plan["recipe_id"]}
-        pool = [r for r in candidates if r["id"] not in exclude]
-    if not pool:
+    # 口味偏好：先剔忌口；在偏好菜系里换，换尽再回退可吃全量
+    prefs = preferences.load()
+    eat, fav = preferences.split_pool(candidates, prefs)
+    if not eat:
+        eat = candidates
+    fav = [r for r in fav if r in eat]
+
+    def pick_from(pool: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        exclude = set(db.recent_recipe_ids(meal_type, d.isoformat(), days=3)) | {plan["recipe_id"]}
+        p = [r for r in pool if r["id"] not in exclude]
+        if not p:  # 放宽：只排除昨天与当前
+            exclude = set(db.recent_recipe_ids(meal_type, d.isoformat(), days=1)) | {plan["recipe_id"]}
+            p = [r for r in pool if r["id"] not in exclude]
+        return random.choice(p) if p else None
+
+    recipe = pick_from(fav or eat)
+    if recipe is None and fav:
+        recipe = pick_from(eat)
+    if recipe is None:
         raise ValueError("菜谱轮换完毕，没有其他可选菜")
-    recipe = random.choice(pool)
 
     new_plan = db.replace_meal_recipe(d.isoformat(), meal_type, recipe["id"])
     db.delete_grocery_for_meal(d.isoformat(), meal_type)

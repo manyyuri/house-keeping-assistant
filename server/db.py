@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS recipes (
   cook_tool TEXT DEFAULT 'none',    -- cook5 | stove | none
   cook_minutes INTEGER,
   tags TEXT,                        -- JSON 标签：["带饭友好",…]
+  cuisine TEXT,                     -- 菜系：川菜/粤菜/韩餐/日料/泰式/家常
   satiety_hint TEXT                 -- 八分饱/六分饱，展示用
 );
 
@@ -729,8 +730,8 @@ def seed_recipes(rows: List[Dict[str, Any]]) -> int:
         for r in rows:
             conn.execute(
                 "INSERT INTO recipes(name, meal_type, slots, ingredients, steps,"
-                " cook_tool, cook_minutes, tags, satiety_hint)"
-                " VALUES(?,?,?,?,?,?,?,?,?)",
+                " cook_tool, cook_minutes, tags, cuisine, satiety_hint)"
+                " VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (
                     r["name"], r["meal_type"],
                     json.dumps(r["slots"], ensure_ascii=False),
@@ -739,11 +740,108 @@ def seed_recipes(rows: List[Dict[str, Any]]) -> int:
                     r.get("cook_tool") or "none",
                     r.get("cook_minutes"),
                     json.dumps(r.get("tags") or [], ensure_ascii=False),
+                    r.get("cuisine") or "家常",
                     r.get("satiety_hint"),
                 ),
             )
         conn.commit()
     return len(rows)
+
+
+# 菜谱改名映射（seed 维护菜名/菜的内容时，旧库按旧名定位后整体刷新，保 id）
+RECIPE_RENAMES: Dict[str, str] = {
+    "荷兰豆牛柳杂粮饭（便当）": "芥蓝牛柳杂粮饭（便当）",
+    "芥蓝牛柳杂粮饭（便当）": "芦笋牛柳杂粮饭（便当）",
+    "白灼虾 + 清炒荷兰豆": "白灼虾 + 清炒芦笋",
+    "椒盐虾 + 白灼芥蓝": "椒盐虾 + 白灼西兰花",
+}
+
+
+def _ensure_column(conn: sqlite3.Connection, table: str, col: str, ddl: str) -> None:
+    cols = [c[1] for c in conn.execute(f"PRAGMA table_info({table})")]
+    if col not in cols:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+
+
+def sync_seed_recipes(rows: List[Dict[str, Any]]) -> int:
+    """把最新 seed 菜谱库同步进非空 recipes 表（保留 id，meal_plans FK 不断）。
+
+    - 补 cuisine 列（老库升级）
+    - 已存在：菜系不同则更新 cuisine；若是「改名菜」则整行刷新到新内容
+    - 新菜：INSERT
+    返回新增条数。幂等，可重复执行。
+    """
+    conn = get_conn()
+    added = 0
+    with _lock:
+        _ensure_column(conn, "recipes", "cuisine", "TEXT")
+        existing = {
+            r["name"]: dict(r) for r in conn.execute("SELECT * FROM recipes")
+        }
+        # 旧名 → 对应行，供改名菜按新名反查旧 id
+        by_name = dict(existing)
+        for old, new in RECIPE_RENAMES.items():
+            if old in existing and new not in by_name:
+                by_name[new] = existing[old]
+        renamed_new = set(RECIPE_RENAMES.values())
+        for r in rows:
+            name = r["name"]
+            row = by_name.get(name)
+            if row is None:
+                conn.execute(
+                    "INSERT INTO recipes(name, meal_type, slots, ingredients, steps,"
+                    " cook_tool, cook_minutes, tags, cuisine, satiety_hint)"
+                    " VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        name, r["meal_type"],
+                        json.dumps(r["slots"], ensure_ascii=False),
+                        json.dumps(r["ingredients"], ensure_ascii=False),
+                        json.dumps(r.get("steps") or [], ensure_ascii=False),
+                        r.get("cook_tool") or "none",
+                        r.get("cook_minutes"),
+                        json.dumps(r.get("tags") or [], ensure_ascii=False),
+                        r.get("cuisine") or "家常",
+                        r.get("satiety_hint"),
+                    ),
+                )
+                added += 1
+                continue
+            rid = row["id"]
+            if name in renamed_new or row.get("cuisine") != (r.get("cuisine") or "家常"):
+                if name in renamed_new:
+                    # 整行刷新（改名菜内容可能整体变了）
+                    conn.execute(
+                        "UPDATE recipes SET name=?, meal_type=?, slots=?, ingredients=?,"
+                        " steps=?, cook_tool=?, cook_minutes=?, tags=?, cuisine=?, satiety_hint=?"
+                        " WHERE id=?",
+                        (
+                            name, r["meal_type"],
+                            json.dumps(r["slots"], ensure_ascii=False),
+                            json.dumps(r["ingredients"], ensure_ascii=False),
+                            json.dumps(r.get("steps") or [], ensure_ascii=False),
+                            r.get("cook_tool") or "none",
+                            r.get("cook_minutes"),
+                            json.dumps(r.get("tags") or [], ensure_ascii=False),
+                            r.get("cuisine") or "家常",
+                            r.get("satiety_hint"),
+                            rid,
+                        ),
+                    )
+                else:
+                    conn.execute(
+                        "UPDATE recipes SET cuisine=? WHERE id=?",
+                        (r.get("cuisine") or "家常", rid),
+                    )
+        # 清理：已从 seed 移除、且无任何餐计划引用的旧菜（保历史，绝不删被引用行）
+        seed_names = {r["name"] for r in rows}
+        conn.execute(
+            "DELETE FROM recipes WHERE name NOT IN ("
+            + ",".join("?" * len(seed_names))
+            + ") AND id NOT IN (SELECT recipe_id FROM meal_plans WHERE recipe_id IS NOT NULL)",
+            tuple(seed_names),
+        )
+        conn.commit()
+    return added
 
 
 # ---------- meal_plans ----------

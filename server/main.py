@@ -68,6 +68,9 @@ async def startup() -> None:
     seeded = meals.seed_default_recipes()
     if seeded:
         logger.info("种子菜谱导入 %d 道（knowledge/recipes）", seeded)
+    else:
+        # 老库：同步最新 seed（补菜系列、改名菜、新菜），幂等
+        meals.sync_default_recipes()
     cfg = llm_providers.get_config()
 
     def _fmt(ep: llm_providers.Endpoint) -> str:

@@ -1529,6 +1529,27 @@ body {
   margin-bottom: 6px;
 }
 
+/* 菜系小签：家常中性灰，川/粤/韩/日给一点朱印级的色彩 */
+.meal-cuisine {
+  display: inline-block;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 5px;
+  margin-right: 6px;
+  vertical-align: 2px;
+  letter-spacing: 0.04em;
+  background: rgba(38, 51, 44, 0.06);
+  color: rgba(38, 51, 44, 0.55);
+}
+
+.meal-cuisine.c-川菜 { background: rgba(179, 64, 42, 0.1); color: var(--seal); }
+.meal-cuisine.c-粤菜 { background: rgba(62, 107, 82, 0.1); color: var(--pine); }
+.meal-cuisine.c-韩餐 { background: rgba(114, 46, 209, 0.09); color: #722ed1; }
+.meal-cuisine.c-日料 { background: rgba(185, 138, 78, 0.12); color: #a2691f; }
+.meal-cuisine.c-泰式 { background: rgba(22, 119, 255, 0.08); color: #1677ff; }
+
 .meal-chips {
   display: flex;
   flex-wrap: wrap;
